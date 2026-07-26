@@ -51,3 +51,5 @@ Deploy command: `npx wrangler deploy`
 Preview deployments (non-production branches) use the same deploy command.
 
 Requires a `CLOUDFLARE_API_TOKEN` env var with the "Edit Cloudflare Workers" template (includes `Workers Scripts:Edit`).
+
+Live at https://mzywang.gnawyzm.workers.dev
