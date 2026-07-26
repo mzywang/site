@@ -7,5 +7,7 @@
 	"assets": {
 		"directory": ".svelte-kit/cloudflare",
 		"binding": "ASSETS"
-	}
+	},
+	"routes": [{ "pattern": "mzywang.dev", "custom_domain": true }],
+	"workers_dev": false
 }

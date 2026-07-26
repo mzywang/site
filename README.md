@@ -52,4 +52,6 @@ Preview deployments (non-production branches) use the same deploy command.
 
 Requires a `CLOUDFLARE_API_TOKEN` env var with the "Edit Cloudflare Workers" template (includes `Workers Scripts:Edit`).
 
-Live at https://site.gnawyzm.workers.dev
+Live at https://mzywang.dev
+
+The custom domain is configured via `routes` in `wrangler.jsonc`; `workers_dev` is disabled so the `*.workers.dev` URL is not publicly served.
