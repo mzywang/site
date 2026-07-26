@@ -45,3 +45,5 @@ You can preview the production build with `npm run preview`.
 
 Build command: `npm run build`
 Deploy command: `npx wrangler pages deploy .svelte-kit/cloudflare`
+
+Preview deployments (non-production branches) use the same deploy command.
