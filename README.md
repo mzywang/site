@@ -41,11 +41,13 @@ You can preview the production build with `npm run preview`.
 
 > To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
 
-## Deploying to Cloudflare Pages
+## Deploying to Cloudflare
+
+This project is deployed as a Worker with static assets (not a classic Cloudflare Pages project). `wrangler.jsonc` sets `main` to the adapter's `_worker.js` and configures `assets.directory`.
 
 Build command: `npm run build`
-Deploy command: `npx wrangler pages deploy .svelte-kit/cloudflare`
+Deploy command: `npx wrangler deploy`
 
 Preview deployments (non-production branches) use the same deploy command.
 
-Requires a `CLOUDFLARE_API_TOKEN` env var with the "Edit Cloudflare Workers" template (includes `Cloudflare Pages:Edit`).
+Requires a `CLOUDFLARE_API_TOKEN` env var with the "Edit Cloudflare Workers" template (includes `Workers Scripts:Edit`).
