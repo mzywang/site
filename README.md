@@ -40,3 +40,8 @@ npm run build
 You can preview the production build with `npm run preview`.
 
 > To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+
+## Deploying to Cloudflare Pages
+
+Build command: `npm run build`
+Deploy command: `npx wrangler pages deploy .svelte-kit/cloudflare`
