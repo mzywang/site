@@ -1,0 +1,5 @@
+if [ "$(node -v | sed -E 's/^v([0-9]+).*/\1/')" -lt 22 ] 2>/dev/null; then
+  export PATH="/opt/homebrew/opt/node/bin:/usr/local/opt/node/bin:$PATH"
+fi
+
+npm run lint && npm run check
