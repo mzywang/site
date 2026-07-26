@@ -47,3 +47,5 @@ Build command: `npm run build`
 Deploy command: `npx wrangler pages deploy .svelte-kit/cloudflare`
 
 Preview deployments (non-production branches) use the same deploy command.
+
+Requires a `CLOUDFLARE_API_TOKEN` env var with the "Edit Cloudflare Workers" template (includes `Cloudflare Pages:Edit`).
