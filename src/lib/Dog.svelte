@@ -29,12 +29,12 @@
 
 		const dog = new THREE.Group();
 
-		const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.62, 1.5, 4, 8), mat);
+		const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.62, 1.5, 8, 16), mat);
 		body.rotation.z = Math.PI / 2;
 		body.position.set(0, 1.05, 0);
 		dog.add(body);
 
-		const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.42, 0.55, 8), mat);
+		const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.42, 0.55, 16), mat);
 		neck.position.set(1.1, 1.55, 0);
 		neck.rotation.z = -0.6;
 		dog.add(neck);
@@ -48,7 +48,7 @@
 		dog.add(snout);
 
 		for (const side of [1, -1]) {
-			const ear = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.4, 4), mat);
+			const ear = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.4, 12), mat);
 			ear.position.set(1.6, 2.28, side * 0.2);
 			ear.rotation.x = side * 0.3;
 			ear.rotation.z = 0.25;
@@ -57,7 +57,7 @@
 
 		const tailBase = new THREE.Group();
 		tailBase.position.set(-1.15, 1.3, 0);
-		const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.16, 0.9, 6), mat);
+		const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.16, 0.9, 12), mat);
 		tail.position.set(0, 0.4, 0);
 		tail.rotation.z = 0.5;
 		tailBase.add(tail);
@@ -73,7 +73,7 @@
 		for (const def of legDefs) {
 			const pivot = new THREE.Group();
 			pivot.position.set(def.x, 1.05, def.z);
-			const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.11, 1.0, 6), mat);
+			const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.11, 1.0, 12), mat);
 			leg.position.set(0, -0.5, 0);
 			pivot.add(leg);
 			dog.add(pivot);
@@ -109,10 +109,29 @@
 		let x = 0;
 		let z = (NEAR_Z + FAR_Z) / 2;
 		let heading = 0;
+		let facingAngle = 0;
 		let targetX = x;
 		let targetZ = z;
 		let moving = false;
 		let walkPhase = 0;
+
+		const TURN_RATE = Math.PI * 1.6; // max radians/sec
+
+		function normalizeAngle(a: number) {
+			a = a % (Math.PI * 2);
+			if (a < -Math.PI) a += Math.PI * 2;
+			if (a > Math.PI) a -= Math.PI * 2;
+			return a;
+		}
+
+		function turnToward(target: number, maxDelta: number) {
+			const diff = normalizeAngle(target - facingAngle);
+			if (Math.abs(diff) <= maxDelta) {
+				facingAngle = normalizeAngle(target);
+			} else {
+				facingAngle = normalizeAngle(facingAngle + Math.sign(diff) * maxDelta);
+			}
+		}
 
 		function pickTarget() {
 			targetX = (Math.random() * 2 - 1) * HALF_WIDTH;
@@ -159,8 +178,9 @@
 				pickTarget();
 			}
 
+			turnToward(heading, TURN_RATE * dt);
 			dog.position.set(x, 0, z);
-			dog.rotation.y = -heading;
+			dog.rotation.y = -facingAngle;
 
 			const swing = moving ? Math.sin(walkPhase) * 0.5 : 0;
 			legPivots.fl.rotation.x = swing;
