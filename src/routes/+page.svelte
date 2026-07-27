@@ -1,5 +1,5 @@
 <script lang="ts">
-	import Dog from '$lib/Dog.svelte';
+	import Fox from '$lib/Fox.svelte';
 </script>
 
 <svelte:head>
@@ -16,7 +16,7 @@
 </main>
 
 <div class="roam-area">
-	<Dog />
+	<Fox />
 </div>
 
 <style>
