@@ -7,18 +7,31 @@
 	let container: HTMLDivElement;
 	let disposed = false;
 
-	const HALF_WIDTH = 9;
 	const NEAR_Z = -3;
 	const FAR_Z = 9;
 	const SPEED = 3.2; // world units / sec
 	const MODEL_SCALE = 0.022;
 	const FORWARD_OFFSET = Math.PI / 2; // model's rest pose faces +Z, not +X
+	const EDGE_MARGIN = 0.82; // keep the model's own body width comfortably inside the frustum
 
 	onMount(() => {
 		const scene = new THREE.Scene();
 		const camera = new THREE.PerspectiveCamera(38, 2, 0.1, 60);
 		camera.position.set(0, 3.2, 15);
 		camera.lookAt(0, 0.9, (NEAR_Z + FAR_Z) / 2);
+
+		// The roam area spans the full page width, but the camera's visible width
+		// at a given depth is fixed by its FOV/aspect - it's narrowest at the
+		// closest point (FAR_Z, nearest the camera). Bound roaming to what's
+		// actually visible there instead of a guessed constant, or the fox walks
+		// out of frame before reaching the container's edge.
+		let halfWidth = 9;
+		function updateHalfWidth() {
+			const closestDistance = camera.position.z - FAR_Z;
+			const vFov = THREE.MathUtils.degToRad(camera.fov);
+			const halfHeightAtDistance = Math.tan(vFov / 2) * closestDistance;
+			halfWidth = halfHeightAtDistance * camera.aspect * EDGE_MARGIN;
+		}
 
 		scene.add(new THREE.HemisphereLight(0xffffff, 0xdadada, 0.6));
 		const key = new THREE.DirectionalLight(0xffffff, 2.0);
@@ -47,6 +60,7 @@
 			camera.aspect = w / h;
 			camera.updateProjectionMatrix();
 			effect.setSize(w, h);
+			updateHalfWidth();
 		}
 		resize();
 		window.addEventListener('resize', resize);
@@ -78,7 +92,7 @@
 		}
 
 		function pickTarget() {
-			targetX = (Math.random() * 2 - 1) * HALF_WIDTH;
+			targetX = (Math.random() * 2 - 1) * halfWidth;
 			targetZ = NEAR_Z + Math.random() * (FAR_Z - NEAR_Z);
 			const dx = targetX - x;
 			const dz = targetZ - z;
@@ -188,9 +202,7 @@
 	.fox-stage :global(table) {
 		margin: 0;
 		border-collapse: collapse;
-		font-family: ui-monospace, Menlo, Consolas, monospace;
-		font-size: 6px;
-		line-height: 6px;
+		font-family: ui-monospace, Menlo, Consolas, monospace !important;
 	}
 
 	.fox-stage :global(td) {
