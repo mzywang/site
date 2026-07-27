@@ -39,7 +39,7 @@
 	.wire {
 		position: relative;
 		width: 100%;
-		margin: 3.5rem 0 1.6rem;
+		margin: 6.5rem 0 1.6rem;
 	}
 
 	hr {

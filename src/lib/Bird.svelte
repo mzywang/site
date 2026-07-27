@@ -2,10 +2,10 @@
 	import { onMount } from 'svelte';
 
 	const ART =
-		'　　　　 _,,_\n　　　-´・｡丶\n　　 　 l.ﾞ｀ (;;ﾐヽ､.＿__\n　 　 　 ｀ﾝ‐ｼ"ﾞ￣￣\n　 　 　 ´　´';
+		'             .\n           .*%*.\n           =@@@#=-.\n  .        =@@@#+-.\n   =::====::*%*.\n   *@@@@@@@#=:\n  -@@@@@@@@@@-\n  -@@@@@@@@@@=\n   =%@@@@@@%=\n    .-=*++=.';
 
 	let x = $state(40);
-	let bottom = $state(-14);
+	let bottom = $state(-6);
 	let facing = $state(1);
 	let tilt = $state(0);
 	let transitionMs = $state(350);
@@ -32,11 +32,11 @@
 	function hop(dir: number) {
 		facing = dir;
 		transitionMs = 300;
-		bottom = -4;
+		bottom = 6;
 		setTimeout(() => {
 			x = Math.max(0, Math.min(maxX, x + dir * 24));
 			setTimeout(() => {
-				bottom = -14;
+				bottom = -6;
 				schedule(900);
 			}, 300);
 		}, 30);
@@ -83,8 +83,8 @@
 	.bird {
 		position: absolute;
 		white-space: pre;
-		font-size: 15px;
-		line-height: 1.1;
+		font-size: 8px;
+		line-height: 1.05;
 		transform-origin: center bottom;
 		user-select: none;
 	}
