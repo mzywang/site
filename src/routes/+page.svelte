@@ -1,3 +1,7 @@
+<script lang="ts">
+	import Dog from '$lib/Dog.svelte';
+</script>
+
 <svelte:head>
 	<title>mzywang.dev</title>
 </svelte:head>
@@ -10,6 +14,10 @@
 		<li><a href="https://www.linkedin.com/in/mzywang">linkedin.com/in/mzywang</a></li>
 	</ul>
 </main>
+
+<div class="roam-area">
+	<Dog />
+</div>
 
 <style>
 	main {
@@ -54,5 +62,15 @@
 
 	a:hover {
 		color: var(--ink);
+	}
+
+	.roam-area {
+		position: fixed;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		height: 50vh;
+		overflow: hidden;
+		pointer-events: none;
 	}
 </style>
