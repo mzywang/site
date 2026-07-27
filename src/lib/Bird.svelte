@@ -1,18 +1,16 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 
-	const IDLE = '~o>';
-	const HOP_UP = '~O>';
-	const FLY_A = '^o^';
-	const FLY_B = '-o-';
+	const ART =
+		'　　　　 _,,_\n　　　-´・｡丶\n　　 　 l.ﾞ｀ (;;ﾐヽ､.＿__\n　 　 　 ｀ﾝ‐ｼ"ﾞ￣￣\n　 　 　 ´　´';
 
-	let glyph = $state(IDLE);
 	let x = $state(40);
-	let bottom = $state(-7);
+	let bottom = $state(-14);
 	let facing = $state(1);
+	let tilt = $state(0);
 	let transitionMs = $state(350);
 
-	let wireWidth = 0;
+	let maxX = 0;
 	let el: HTMLDivElement;
 
 	function schedule(delay = 900) {
@@ -33,46 +31,38 @@
 
 	function hop(dir: number) {
 		facing = dir;
-		transitionMs = 350;
-		glyph = HOP_UP;
-		bottom = 4;
+		transitionMs = 300;
+		bottom = -4;
 		setTimeout(() => {
-			x = Math.max(0, Math.min(wireWidth, x + dir * 22));
+			x = Math.max(0, Math.min(maxX, x + dir * 24));
 			setTimeout(() => {
-				bottom = -7;
-				glyph = IDLE;
+				bottom = -14;
 				schedule(900);
-			}, 350);
+			}, 300);
 		}, 30);
 	}
 
 	function fly(dir: number) {
 		facing = dir;
 		transitionMs = 1100;
-		bottom = 46;
-		glyph = FLY_A;
-		let flap = 0;
-		const flapTimer = setInterval(() => {
-			flap = 1 - flap;
-			glyph = flap ? FLY_A : FLY_B;
-		}, 150);
+		bottom = 60;
+		tilt = dir * -6;
 		setTimeout(() => {
-			x = Math.random() * wireWidth;
+			x = Math.random() * maxX;
 		}, 30);
 		setTimeout(() => {
-			bottom = -7;
+			bottom = -14;
+			tilt = 0;
 		}, 700);
 		setTimeout(() => {
-			clearInterval(flapTimer);
 			transitionMs = 350;
-			glyph = IDLE;
 			schedule(900);
 		}, 1150);
 	}
 
 	onMount(() => {
-		wireWidth = el.parentElement!.clientWidth - 24;
-		x = wireWidth * 0.4;
+		maxX = el.parentElement!.clientWidth - el.offsetWidth;
+		x = maxX * 0.4;
 		schedule(1200);
 	});
 </script>
@@ -82,19 +72,19 @@
 	bind:this={el}
 	style:left="{x}px"
 	style:bottom="{bottom}px"
-	style:transform="scaleX({facing})"
-	style:transition="left {transitionMs}ms ease, bottom {transitionMs}ms ease, transform 0.35s ease"
+	style:transform="scaleX({facing}) rotate({tilt}deg)"
+	style:transition="left {transitionMs}ms ease, bottom {transitionMs}ms ease, transform {transitionMs}ms
+	ease"
 >
-	{glyph}
+	{ART}
 </div>
 
 <style>
 	.bird {
 		position: absolute;
 		white-space: pre;
-		font-size: 19px;
-		font-weight: 700;
-		line-height: 1;
+		font-size: 15px;
+		line-height: 1.1;
 		transform-origin: center bottom;
 		user-select: none;
 	}
