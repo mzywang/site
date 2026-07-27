@@ -1,10 +1,17 @@
+<script lang="ts">
+	import Bird from '$lib/Bird.svelte';
+</script>
+
 <svelte:head>
 	<title>mzywang.dev</title>
 </svelte:head>
 
 <main>
 	<h1>mzywang</h1>
-	<hr />
+	<div class="wire">
+		<hr />
+		<Bird />
+	</div>
 	<ul>
 		<li><a href="https://github.com/mzywang">github.com/mzywang</a></li>
 		<li><a href="https://www.linkedin.com/in/mzywang">linkedin.com/in/mzywang</a></li>
@@ -29,12 +36,18 @@
 		margin: 0;
 	}
 
+	.wire {
+		position: relative;
+		width: 100%;
+		margin: 3.5rem 0 1.6rem;
+	}
+
 	hr {
 		width: 100%;
 		height: 0;
 		border: none;
 		border-top: 1px dashed var(--ink-dim);
-		margin: 0.9rem 0 1.6rem;
+		margin: 0;
 	}
 
 	ul {
