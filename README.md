@@ -2,6 +2,8 @@
 
 A SvelteKit site deployed to Cloudflare as a Worker with static assets.
 
+Live at https://mzywang.dev
+
 ## Developing
 
 ```bash
