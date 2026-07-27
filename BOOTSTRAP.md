@@ -1,12 +1,14 @@
 # Bootstrap
 
-This repo deploys to Cloudflare as a Worker with static assets, built with SvelteKit's `adapter-cloudflare`. Setup splits into local code changes (each step below is a commit) and Cloudflare dashboard configuration, which has no `wrangler` CLI equivalent — confirmed via `wrangler --help` and Cloudflare's API docs, none of connecting the repo, setting build/deploy commands, branch control, or API token creation are exposed as commands or endpoints.
+This repo deploys to Cloudflare as a Worker with static assets, built with SvelteKit's `adapter-cloudflare`. Setup splits into local code changes (each step below is its own pull request, linked inline) and Cloudflare dashboard configuration, which has no `wrangler` CLI equivalent — confirmed via `wrangler --help` and Cloudflare's API docs, none of connecting the repo, setting build/deploy commands, branch control, or API token creation are exposed as commands or endpoints.
 
 Prerequisites: Node >= 22 (Wrangler 4 requires it), `gh` CLI authenticated, a Cloudflare account, a GitHub account.
 
 ## Local Setup
 
 ### Scaffold the Project
+
+**PR:** [#8](https://github.com/mzywang/site/pull/8)
 
 ```bash
 npx sv create site --template minimal --types ts \
@@ -18,6 +20,8 @@ npm run gen
 Use `cfTarget:workers`, **not** `cfTarget:pages` — connecting a repo through Workers & Pages now provisions a Worker with static assets, not classic Pages.
 
 ### Gitignore the Generated Types
+
+**PR:** [#9](https://github.com/mzywang/site/pull/9)
 
 - `.gitignore` — add `/worker-configuration.d.ts`
 - `.prettierignore` — add `worker-configuration.d.ts` (still generated on disk locally; Prettier doesn't read `.gitignore`, ESLint does)
@@ -31,9 +35,11 @@ Use `cfTarget:workers`, **not** `cfTarget:pages` — connecting a repo through W
   + "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
   ```
 
-`wrangler types`'s output isn't a pure function of `wrangler.jsonc` — it also depends on whether `.svelte-kit/cloudflare/_worker.js` already exists on disk, so a committed copy can look "stale" for reasons that have nothing to do with a real config change. See the [Gitignore the generated worker-configuration.d.ts](https://github.com/mzywang/site/commit/88b79ad2f0c1154474fafb65145543e0fb43b14f) commit for detail.
+`wrangler types`'s output isn't a pure function of `wrangler.jsonc` — it also depends on whether `.svelte-kit/cloudflare/_worker.js` already exists on disk, so a committed copy can look "stale" for reasons that have nothing to do with a real config change. See [PR #9](https://github.com/mzywang/site/pull/9) for detail.
 
 ### Pin the Node Version
+
+**PR:** [#10](https://github.com/mzywang/site/pull/10)
 
 ```bash
 echo 24 > .nvmrc
@@ -43,12 +49,14 @@ Skip if your default Node is already >= 22.
 
 ### Disable checkJs for the Compiled Worker Bundle
 
+**PR:** [#11](https://github.com/mzywang/site/pull/11)
+
 ```diff
 - "checkJs": true,
 + "checkJs": false,
 ```
 
-Once `main` is set in `wrangler.jsonc` (`cfTarget:workers` does this for you), `wrangler types` can add a `mainModule` reference that pulls the whole compiled worker bundle into `svelte-check`'s scope, producing hundreds of false errors. `checkJs: false` costs nothing here since there's no plain-JS source. See the [Configure remaining Workers-with-assets gaps](https://github.com/mzywang/site/commit/0693f3a4132a3b3dca1cd2656a542b4571004e59) commit for detail.
+Once `main` is set in `wrangler.jsonc` (`cfTarget:workers` does this for you), `wrangler types` can add a `mainModule` reference that pulls the whole compiled worker bundle into `svelte-check`'s scope, producing hundreds of false errors. `checkJs: false` costs nothing here since there's no plain-JS source. See [PR #11](https://github.com/mzywang/site/pull/11) for detail.
 
 Sanity-check locally before touching Cloudflare:
 
@@ -59,6 +67,8 @@ npm run gen && npm run build && npx wrangler deploy --dry-run
 Should print `env.ASSETS  Assets` under bindings, no errors.
 
 ### Create the GitHub Repo and Branch Protection
+
+**PR:** none — this step creates the repo itself, so there's nothing to open a pull request against yet.
 
 ```bash
 gh repo create <you>/<repo> --public --source=. --remote=origin
@@ -122,9 +132,15 @@ A correctly-scoped token's summary screen looks like this. The account (not just
 
 ### Add a Custom Domain
 
+**PR:** [#13](https://github.com/mzywang/site/pull/13)
+
 ```jsonc
 "routes": [{ "pattern": "your-domain.tld", "custom_domain": true }],
 "workers_dev": false
 ```
 
 Redeploy (`wrangler deploy`, or push to `main`) to provision DNS + SSL.
+
+---
+
+This document was written in [PR #12](https://github.com/mzywang/site/pull/12).
