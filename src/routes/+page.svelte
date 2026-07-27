@@ -3,102 +3,56 @@
 </svelte:head>
 
 <main>
-	<div class="frame">
-		<div class="titlebar">
-			<span>[ mzywang.dev ]</span>
-		</div>
-
-		<section>
-			<p class="line"><span class="prompt">$</span> whoami</p>
-			<p class="output">mzywang<span class="cursor">_</span></p>
-		</section>
-
-		<section>
-			<p class="line"><span class="prompt">$</span> links --list</p>
-			<ul class="output links">
-				<li><span class="arrow">→</span> <a href="https://github.com/mzywang">github.com/mzywang</a></li>
-				<li>
-					<span class="arrow">→</span>
-					<a href="https://www.linkedin.com/in/mzywang">linkedin.com/in/mzywang</a>
-				</li>
-			</ul>
-		</section>
-	</div>
+	<h1>mzywang</h1>
+	<hr />
+	<ul>
+		<li><a href="https://github.com/mzywang">github.com/mzywang</a></li>
+		<li><a href="https://www.linkedin.com/in/mzywang">linkedin.com/in/mzywang</a></li>
+	</ul>
 </main>
 
 <style>
 	main {
 		display: flex;
-		justify-content: center;
+		flex-direction: column;
 		align-items: flex-start;
 		min-height: 100svh;
-		padding: 4rem 1.25rem;
-	}
-
-	.frame {
 		width: 100%;
-		max-width: 30rem;
-		border: 1px solid var(--rule);
+		max-width: 24rem;
+		margin: 0 auto;
+		padding: 6rem 1.25rem;
 	}
 
-	.titlebar {
-		border-bottom: 1px solid var(--rule);
-		padding: 0.6rem 1rem;
-		font-weight: 600;
-	}
-
-	section {
-		padding: 1.1rem 1.25rem;
-	}
-
-	section + section {
-		border-top: 1px dashed var(--ink-dim);
-	}
-
-	.line {
-		margin: 0 0 0.4rem;
-		color: var(--ink-dim);
-	}
-
-	.prompt {
-		color: var(--ink);
-		font-weight: 600;
-	}
-
-	.output {
+	h1 {
+		font-size: 1.1rem;
+		font-weight: 400;
 		margin: 0;
-		padding-left: 1.2rem;
 	}
 
-	.cursor {
-		display: inline-block;
-		animation: blink 1s step-start infinite;
+	hr {
+		width: 100%;
+		height: 0;
+		border: none;
+		border-top: 1px dashed var(--ink-dim);
+		margin: 0.9rem 0 1.6rem;
 	}
 
-	@keyframes blink {
-		50% {
-			opacity: 0;
-		}
-	}
-
-	.links {
+	ul {
 		list-style: none;
+		margin: 0;
+		padding: 0;
 	}
 
-	.links li {
-		margin: 0.2rem 0;
+	li + li {
+		margin-top: 0.35rem;
 	}
 
-	.arrow {
+	a {
+		text-decoration: none;
 		color: var(--ink-dim);
 	}
 
-	.links a {
-		text-decoration: none;
-		border-bottom: 1px solid var(--ink-dim);
-	}
-
-	.links a:hover {
-		border-color: var(--ink);
+	a:hover {
+		color: var(--ink);
 	}
 </style>
