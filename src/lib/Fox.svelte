@@ -9,10 +9,14 @@
 
 	const NEAR_Z = -3;
 	const FAR_Z = 9;
-	const MODEL_SCALE = 2.3;
+	const MODEL_SCALE = 3.45;
 	const SPEED = 0.61 * MODEL_SCALE; // world units / sec, calibrated to the Walk clip's stance-phase stride
 	const FORWARD_OFFSET = Math.PI / 2;
 	const EDGE_MARGIN = 0.82; // keep the model's own body width comfortably inside the frustum
+	const ROAM_INSET = 0.72; // shrink random-walk targets inward so the fox never reaches the boundary line
+	const CAMERA_FOV_DEG = 16; // a narrow fov + distant camera flattens the depth perspective
+	const CAMERA_Z = 24;
+	const CAMERA_Y = 3.6;
 
 	const CLIP_NAMES = [
 		'NeutralStand01',
@@ -31,8 +35,8 @@
 
 	onMount(() => {
 		const scene = new THREE.Scene();
-		const camera = new THREE.PerspectiveCamera(38, 2, 0.1, 60);
-		camera.position.set(0, 3.2, 15);
+		const camera = new THREE.PerspectiveCamera(CAMERA_FOV_DEG, 2, 0.1, 60);
+		camera.position.set(0, CAMERA_Y, CAMERA_Z);
 		camera.lookAt(0, 0.9, (NEAR_Z + FAR_Z) / 2);
 
 		let halfWidth = 9;
@@ -234,8 +238,10 @@
 				targetX = explicitTarget.x;
 				targetZ = explicitTarget.z;
 			} else {
-				targetX = (Math.random() * 2 - 1) * halfWidth;
-				targetZ = NEAR_Z + Math.random() * (FAR_Z - NEAR_Z);
+				const midZ = (NEAR_Z + FAR_Z) / 2;
+				const halfDepth = (FAR_Z - NEAR_Z) / 2;
+				targetX = (Math.random() * 2 - 1) * halfWidth * ROAM_INSET;
+				targetZ = midZ + (Math.random() * 2 - 1) * halfDepth * ROAM_INSET;
 			}
 			if (Math.hypot(targetX - x, targetZ - z) < 0.5) {
 				scheduleRestDecision();
@@ -343,6 +349,9 @@
 	.fox-stage {
 		width: 100%;
 		height: 100%;
+		display: flex;
+		justify-content: center;
+		align-items: center;
 	}
 
 	.fox-stage :global(table) {
