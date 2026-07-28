@@ -9,13 +9,14 @@
 
 	const NEAR_Z = -3;
 	const FAR_Z = 9;
-	const SPEED = 3.2; // world units / sec
-	const MODEL_SCALE = 1.7;
+	const MODEL_SCALE = 2.3;
+	const SPEED = 0.61 * MODEL_SCALE; // world units / sec, calibrated to the Walk clip's stance-phase stride
 	const FORWARD_OFFSET = Math.PI / 2;
 	const EDGE_MARGIN = 0.82; // keep the model's own body width comfortably inside the frustum
 
 	const CLIP_NAMES = [
 		'NeutralStand01',
+		'Alert',
 		'Walk',
 		'WalkStart',
 		'WalkStop',
@@ -40,6 +41,44 @@
 			const vFov = THREE.MathUtils.degToRad(camera.fov);
 			const halfHeightAtDistance = Math.tan(vFov / 2) * closestDistance;
 			halfWidth = halfHeightAtDistance * camera.aspect * EDGE_MARGIN;
+		}
+
+		let boundaryGroup: THREE.Group | undefined;
+		const dashMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
+		function addEdgeDashes(group: THREE.Group, x1: number, z1: number, x2: number, z2: number) {
+			const dashLength = 0.35;
+			const gap = 0.35;
+			const step = dashLength + gap;
+			const dx = x2 - x1;
+			const dz = z2 - z1;
+			const len = Math.hypot(dx, dz);
+			const angle = Math.atan2(dz, dx);
+			const count = Math.floor(len / step);
+			for (let i = 0; i <= count; i++) {
+				const t = i * step;
+				if (t + dashLength > len) break;
+				const cx = x1 + (dx / len) * (t + dashLength / 2);
+				const cz = z1 + (dz / len) * (t + dashLength / 2);
+				const dash = new THREE.Mesh(new THREE.BoxGeometry(dashLength, 0.05, 0.06), dashMaterial);
+				dash.position.set(cx, 0.025, cz);
+				dash.rotation.y = -angle;
+				group.add(dash);
+			}
+		}
+		function updateBoundary() {
+			if (boundaryGroup) {
+				scene.remove(boundaryGroup);
+				for (const child of boundaryGroup.children) {
+					if (child instanceof THREE.Mesh) child.geometry.dispose();
+				}
+			}
+			const group = new THREE.Group();
+			addEdgeDashes(group, -halfWidth, NEAR_Z, halfWidth, NEAR_Z);
+			addEdgeDashes(group, halfWidth, NEAR_Z, halfWidth, FAR_Z);
+			addEdgeDashes(group, halfWidth, FAR_Z, -halfWidth, FAR_Z);
+			addEdgeDashes(group, -halfWidth, FAR_Z, -halfWidth, NEAR_Z);
+			scene.add(group);
+			boundaryGroup = group;
 		}
 
 		scene.add(new THREE.HemisphereLight(0xffffff, 0xdadada, 0.6));
@@ -70,6 +109,7 @@
 			camera.updateProjectionMatrix();
 			effect.setSize(w, h);
 			updateHalfWidth();
+			updateBoundary();
 		}
 		resize();
 		window.addEventListener('resize', resize);
@@ -77,13 +117,15 @@
 		let x = 0;
 		let z = (NEAR_Z + FAR_Z) / 2;
 		let heading = 0;
-		let facingAngle = 0;
+		let facingAngle = -Math.PI / 2; // start facing away from the camera, into the scene
 		let targetX = x;
 		let targetZ = z;
 		let moving = false;
 		let busy = false;
+		let turningTo: number | null = null;
+		let onTurnComplete: (() => void) | null = null;
 
-		const TURN_RATE = Math.PI * 1.6; // max radians/sec
+		const TURN_SHARPNESS = 5; // exponential ease-out rate for turning, per second
 
 		function normalizeAngle(a: number) {
 			a = a % (Math.PI * 2);
@@ -92,13 +134,15 @@
 			return a;
 		}
 
-		function turnToward(target: number, maxDelta: number) {
+		function turnToward(target: number, dt: number) {
 			const diff = normalizeAngle(target - facingAngle);
-			if (Math.abs(diff) <= maxDelta) {
-				facingAngle = normalizeAngle(target);
-			} else {
-				facingAngle = normalizeAngle(facingAngle + Math.sign(diff) * maxDelta);
-			}
+			const factor = 1 - Math.exp(-TURN_SHARPNESS * dt);
+			facingAngle = normalizeAngle(facingAngle + diff * factor);
+		}
+
+		function turnTo(target: number, onComplete?: () => void) {
+			turningTo = target;
+			onTurnComplete = onComplete ?? null;
 		}
 
 		let fox: THREE.Object3D | undefined;
@@ -185,9 +229,14 @@
 			});
 		}
 
-		function beginWalk() {
-			targetX = (Math.random() * 2 - 1) * halfWidth;
-			targetZ = NEAR_Z + Math.random() * (FAR_Z - NEAR_Z);
+		function beginWalk(explicitTarget?: { x: number; z: number }) {
+			if (explicitTarget) {
+				targetX = explicitTarget.x;
+				targetZ = explicitTarget.z;
+			} else {
+				targetX = (Math.random() * 2 - 1) * halfWidth;
+				targetZ = NEAR_Z + Math.random() * (FAR_Z - NEAR_Z);
+			}
 			if (Math.hypot(targetX - x, targetZ - z) < 0.5) {
 				scheduleRestDecision();
 				return;
@@ -206,6 +255,14 @@
 			});
 		}
 
+		function greetVisitor() {
+			playOnce('Alert', 0.3, () => {
+				turnTo(Math.PI / 2, () => {
+					beginWalk({ x: 0, z: FAR_Z - 1.5 });
+				});
+			});
+		}
+
 		const loader = new GLTFLoader();
 		loader.load('/models/fox.glb', (gltf) => {
 			if (disposed) return;
@@ -221,7 +278,7 @@
 			playLoop('NeutralStand01', 0);
 			currentAction?.play();
 
-			setTimeout(scheduleRestDecision, 1000);
+			setTimeout(greetVisitor, 2000 + Math.random() * 1500);
 		});
 
 		let last = performance.now();
@@ -242,12 +299,21 @@
 						arrive();
 					} else {
 						heading = Math.atan2(dz, dx);
-						turnToward(heading, TURN_RATE * dt);
+						turnToward(heading, dt);
 						const angleDiff = Math.abs(normalizeAngle(heading - facingAngle));
 						const alignment = Math.max(0, Math.cos(angleDiff));
 						const step = Math.min(SPEED * dt * alignment, dist);
 						x += Math.cos(facingAngle) * step;
 						z += Math.sin(facingAngle) * step;
+					}
+				} else if (turningTo !== null) {
+					turnToward(turningTo, dt);
+					if (Math.abs(normalizeAngle(turningTo - facingAngle)) < 0.03) {
+						facingAngle = turningTo;
+						turningTo = null;
+						const done = onTurnComplete;
+						onTurnComplete = null;
+						done?.();
 					}
 				}
 
