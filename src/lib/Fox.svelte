@@ -10,9 +10,23 @@
 	const NEAR_Z = -3;
 	const FAR_Z = 9;
 	const SPEED = 3.2; // world units / sec
-	const MODEL_SCALE = 0.022;
-	const FORWARD_OFFSET = Math.PI / 2; // model's rest pose faces +Z, not +X
+	const MODEL_SCALE = 1.7;
+	const FORWARD_OFFSET = Math.PI / 2;
 	const EDGE_MARGIN = 0.82; // keep the model's own body width comfortably inside the frustum
+
+	const CLIP_NAMES = [
+		'NeutralStand01',
+		'Walk',
+		'WalkStart',
+		'WalkStop',
+		'Sitting01',
+		'StandToSitting',
+		'SittingToStand',
+		'Lying01',
+		'StandToLying',
+		'LyingToStand'
+	] as const;
+	type ClipName = (typeof CLIP_NAMES)[number];
 
 	onMount(() => {
 		const scene = new THREE.Scene();
@@ -20,11 +34,6 @@
 		camera.position.set(0, 3.2, 15);
 		camera.lookAt(0, 0.9, (NEAR_Z + FAR_Z) / 2);
 
-		// The roam area spans the full page width, but the camera's visible width
-		// at a given depth is fixed by its FOV/aspect - it's narrowest at the
-		// closest point (FAR_Z, nearest the camera). Bound roaming to what's
-		// actually visible there instead of a guessed constant, or the fox walks
-		// out of frame before reaching the container's edge.
 		let halfWidth = 9;
 		function updateHalfWidth() {
 			const closestDistance = camera.position.z - FAR_Z;
@@ -72,6 +81,7 @@
 		let targetX = x;
 		let targetZ = z;
 		let moving = false;
+		let busy = false;
 
 		const TURN_RATE = Math.PI * 1.6; // max radians/sec
 
@@ -91,28 +101,109 @@
 			}
 		}
 
-		function pickTarget() {
+		let fox: THREE.Object3D | undefined;
+		let mixer: THREE.AnimationMixer | undefined;
+		let currentAction: THREE.AnimationAction | undefined;
+		const actions: Partial<Record<ClipName, THREE.AnimationAction>> = {};
+
+		function playLoop(name: ClipName, fade = 0.3) {
+			const action = actions[name];
+			if (!action || currentAction === action) return;
+			action.reset();
+			action.setLoop(THREE.LoopRepeat, Infinity);
+			action.fadeIn(fade).play();
+			currentAction?.fadeOut(fade);
+			currentAction = action;
+		}
+
+		function playOnce(name: ClipName, fade: number, onDone: () => void) {
+			const action = actions[name];
+			if (!action || !mixer) {
+				onDone();
+				return;
+			}
+			busy = true;
+			action.reset();
+			action.setLoop(THREE.LoopOnce, 1);
+			action.clampWhenFinished = true;
+			action.fadeIn(fade).play();
+			currentAction?.fadeOut(fade);
+			currentAction = action;
+			const mixerRef = mixer;
+			const handler = (e: { action: THREE.AnimationAction }) => {
+				if (e.action !== action) return;
+				mixerRef.removeEventListener('finished', handler);
+				busy = false;
+				onDone();
+			};
+			mixerRef.addEventListener('finished', handler);
+		}
+
+		function scheduleRestDecision() {
+			setTimeout(decideNext, 4000 + Math.random() * 7000);
+		}
+
+		function decideNext() {
+			if (moving || busy) return;
+			const r = Math.random();
+			if (r < 0.45) {
+				beginWalk();
+			} else if (r < 0.75) {
+				goSit();
+			} else {
+				goLie();
+			}
+		}
+
+		function goSit() {
+			playOnce('StandToSitting', 0.3, () => {
+				playLoop('Sitting01', 0.2);
+				setTimeout(
+					() => {
+						playOnce('SittingToStand', 0.3, () => {
+							playLoop('NeutralStand01', 0.2);
+							scheduleRestDecision();
+						});
+					},
+					3000 + Math.random() * 5000
+				);
+			});
+		}
+
+		function goLie() {
+			playOnce('StandToLying', 0.3, () => {
+				playLoop('Lying01', 0.2);
+				setTimeout(
+					() => {
+						playOnce('LyingToStand', 0.3, () => {
+							playLoop('NeutralStand01', 0.2);
+							scheduleRestDecision();
+						});
+					},
+					5000 + Math.random() * 8000
+				);
+			});
+		}
+
+		function beginWalk() {
 			targetX = (Math.random() * 2 - 1) * halfWidth;
 			targetZ = NEAR_Z + Math.random() * (FAR_Z - NEAR_Z);
 			if (Math.hypot(targetX - x, targetZ - z) < 0.5) {
-				moving = false;
-				setTimeout(pickTarget, 400);
+				scheduleRestDecision();
 				return;
 			}
 			moving = true;
+			playOnce('WalkStart', 0.25, () => {
+				if (moving) playLoop('Walk', 0.2);
+			});
 		}
 
-		let fox: THREE.Object3D | undefined;
-		let mixer: THREE.AnimationMixer | undefined;
-		let walkAction: THREE.AnimationAction | undefined;
-		let idleAction: THREE.AnimationAction | undefined;
-		let currentAction: THREE.AnimationAction | undefined;
-
-		function setAction(next: THREE.AnimationAction | undefined) {
-			if (!next || currentAction === next) return;
-			next.reset().fadeIn(0.35).play();
-			currentAction?.fadeOut(0.35);
-			currentAction = next;
+		function arrive() {
+			moving = false;
+			playOnce('WalkStop', 0.25, () => {
+				playLoop('NeutralStand01', 0.2);
+				scheduleRestDecision();
+			});
 		}
 
 		const loader = new GLTFLoader();
@@ -123,20 +214,17 @@
 			scene.add(fox);
 
 			mixer = new THREE.AnimationMixer(fox);
-			const walkClip = THREE.AnimationClip.findByName(gltf.animations, 'Walk');
-			const idleClip = THREE.AnimationClip.findByName(gltf.animations, 'Survey');
-			walkAction = walkClip ? mixer.clipAction(walkClip) : undefined;
-			idleAction = idleClip ? mixer.clipAction(idleClip) : undefined;
-			if (idleAction) {
-				currentAction = idleAction;
-				idleAction.play();
+			for (const name of CLIP_NAMES) {
+				const clip = gltf.animations.find((a) => a.name.endsWith('|Fox_' + name));
+				if (clip) actions[name] = mixer.clipAction(clip);
 			}
+			playLoop('NeutralStand01', 0);
+			currentAction?.play();
 
-			setTimeout(pickTarget, 800);
+			setTimeout(scheduleRestDecision, 1000);
 		});
 
 		let last = performance.now();
-		let pauseUntil = 0;
 
 		function tick(now: number) {
 			if (disposed) return;
@@ -151,8 +239,7 @@
 					if (dist < 0.15) {
 						x = targetX;
 						z = targetZ;
-						moving = false;
-						pauseUntil = now + 4000 + Math.random() * 7000;
+						arrive();
 					} else {
 						heading = Math.atan2(dz, dx);
 						turnToward(heading, TURN_RATE * dt);
@@ -162,15 +249,11 @@
 						x += Math.cos(facingAngle) * step;
 						z += Math.sin(facingAngle) * step;
 					}
-				} else if (now > pauseUntil && pauseUntil > 0) {
-					pauseUntil = 0;
-					pickTarget();
 				}
 
 				fox.position.set(x, 0, z);
 				fox.rotation.y = -facingAngle + FORWARD_OFFSET;
 
-				setAction(moving ? walkAction : idleAction);
 				mixer?.update(dt);
 			}
 
@@ -188,10 +271,7 @@
 </script>
 
 <div class="fox-stage" bind:this={container}></div>
-<p class="credit">
-	fox model: PixelMannen (CC0) · rig &amp; animation: tomkranis (CC BY 4.0) · glTF: AsoboStudio
-	&amp; scurest (CC BY 4.0)
-</p>
+<p class="credit">fox model &amp; animation: AnimalMesh 3D (CC BY 4.0)</p>
 
 <style>
 	.fox-stage {
