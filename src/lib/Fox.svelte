@@ -94,14 +94,11 @@
 		function pickTarget() {
 			targetX = (Math.random() * 2 - 1) * halfWidth;
 			targetZ = NEAR_Z + Math.random() * (FAR_Z - NEAR_Z);
-			const dx = targetX - x;
-			const dz = targetZ - z;
-			if (Math.hypot(dx, dz) < 0.5) {
+			if (Math.hypot(targetX - x, targetZ - z) < 0.5) {
 				moving = false;
 				setTimeout(pickTarget, 400);
 				return;
 			}
-			heading = Math.atan2(dz, dx);
 			moving = true;
 		}
 
@@ -151,22 +148,25 @@
 					const dx = targetX - x;
 					const dz = targetZ - z;
 					const dist = Math.hypot(dx, dz);
-					const step = SPEED * dt;
-					if (step >= dist) {
+					if (dist < 0.15) {
 						x = targetX;
 						z = targetZ;
 						moving = false;
 						pauseUntil = now + 600 + Math.random() * 2200;
 					} else {
-						x += (dx / dist) * step;
-						z += (dz / dist) * step;
+						heading = Math.atan2(dz, dx);
+						turnToward(heading, TURN_RATE * dt);
+						const angleDiff = Math.abs(normalizeAngle(heading - facingAngle));
+						const alignment = Math.max(0, Math.cos(angleDiff));
+						const step = Math.min(SPEED * dt * alignment, dist);
+						x += Math.cos(facingAngle) * step;
+						z += Math.sin(facingAngle) * step;
 					}
 				} else if (now > pauseUntil && pauseUntil > 0) {
 					pauseUntil = 0;
 					pickTarget();
 				}
 
-				turnToward(heading, TURN_RATE * dt);
 				fox.position.set(x, 0, z);
 				fox.rotation.y = -facingAngle + FORWARD_OFFSET;
 
