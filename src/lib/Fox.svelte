@@ -12,9 +12,9 @@
 	const MODEL_SCALE = 3.45;
 	const SPEED = 0.61 * MODEL_SCALE; // world units / sec, calibrated to the Walk clip's stance-phase stride
 	const FORWARD_OFFSET = Math.PI / 2;
-	const EDGE_MARGIN = 0.82; // keep the model's own body width comfortably inside the frustum
+	const EDGE_MARGIN = 0.95; // keep the model's own body width comfortably inside the frustum
 	const ROAM_INSET = 0.72; // shrink random-walk targets inward so the fox never reaches the boundary line
-	const CAMERA_FOV_DEG = 16; // a narrow fov + distant camera flattens the depth perspective
+	const CAMERA_FOV_DEG = 23; // a narrow fov + distant camera flattens the depth perspective
 	const CAMERA_Z = 24;
 	const CAMERA_Y = 3.6;
 
@@ -37,7 +37,7 @@
 		const scene = new THREE.Scene();
 		const camera = new THREE.PerspectiveCamera(CAMERA_FOV_DEG, 2, 0.1, 60);
 		camera.position.set(0, CAMERA_Y, CAMERA_Z);
-		camera.lookAt(0, 0.9, (NEAR_Z + FAR_Z) / 2);
+		camera.lookAt(0, 1.9, (NEAR_Z + FAR_Z) / 2);
 
 		let halfWidth = 9;
 		function updateHalfWidth() {
@@ -263,6 +263,7 @@
 
 		function greetVisitor() {
 			playOnce('Alert', 0.3, () => {
+				playLoop('Walk', 0.25);
 				turnTo(Math.PI / 2, () => {
 					beginWalk({ x: 0, z: FAR_Z - 1.5 });
 				});
@@ -362,6 +363,7 @@
 
 	.fox-stage :global(td) {
 		padding: 0;
+		text-align: center;
 	}
 
 	.credit {
