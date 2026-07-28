@@ -152,7 +152,7 @@
 						x = targetX;
 						z = targetZ;
 						moving = false;
-						pauseUntil = now + 600 + Math.random() * 2200;
+						pauseUntil = now + 4000 + Math.random() * 7000;
 					} else {
 						heading = Math.atan2(dz, dx);
 						turnToward(heading, TURN_RATE * dt);
