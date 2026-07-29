@@ -177,7 +177,7 @@
 			action.setLoop(THREE.LoopOnce, 1);
 			action.clampWhenFinished = true;
 			action.fadeIn(fade).play();
-			currentAction?.fadeOut(fade);
+			if (currentAction && currentAction !== action) currentAction.fadeOut(fade);
 			currentAction = action;
 			const mixerRef = mixer;
 			const handler = (e: { action: THREE.AnimationAction }) => {
