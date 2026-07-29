@@ -122,8 +122,7 @@
 
 		let x = 0;
 		let z = (NEAR_Z + FAR_Z) / 2;
-		let heading = 0;
-		let facingAngle = -Math.PI / 2; // start facing away from the camera, into the scene
+		let facingAngle = 0; // start facing screen-right
 		let targetX = x;
 		let targetZ = z;
 		let moving = false;
@@ -135,7 +134,6 @@
 		let turnSegElapsed = 0;
 		let turnSegDuration = 0.5;
 
-		const TURN_SHARPNESS = 5; // exponential ease-out rate for the walk-realignment turn, per second
 		const TURN_STEP = Math.PI / 2; // Fox_TurnL90 / Fox_TurnR90 each pivot exactly 90 degrees
 
 		function normalizeAngle(a: number) {
@@ -143,12 +141,6 @@
 			if (a < -Math.PI) a += Math.PI * 2;
 			if (a > Math.PI) a -= Math.PI * 2;
 			return a;
-		}
-
-		function turnToward(target: number, dt: number) {
-			const diff = normalizeAngle(target - facingAngle);
-			const factor = 1 - Math.exp(-TURN_SHARPNESS * dt);
-			facingAngle = normalizeAngle(facingAngle + diff * factor);
 		}
 
 		let fox: THREE.Object3D | undefined;
@@ -266,24 +258,62 @@
 			});
 		}
 
+		function pickCardinalWalk(): { angle: number; tx: number; tz: number } | null {
+			const midZ = (NEAR_Z + FAR_Z) / 2;
+			const halfDepth = (FAR_Z - NEAR_Z) / 2;
+			const maxX = halfWidth * ROAM_INSET;
+			const maxZ = midZ + halfDepth * ROAM_INSET;
+			const minZ = midZ - halfDepth * ROAM_INSET;
+
+			const candidates = [
+				{ angle: 0, tx: maxX, tz: z },
+				{ angle: Math.PI, tx: -maxX, tz: z },
+				{ angle: Math.PI / 2, tx: x, tz: maxZ },
+				{ angle: -Math.PI / 2, tx: x, tz: minZ }
+			].filter((c) => Math.hypot(c.tx - x, c.tz - z) > 1);
+
+			if (candidates.length === 0) return null;
+			const pick = candidates[Math.floor(Math.random() * candidates.length)];
+			const room = Math.hypot(pick.tx - x, pick.tz - z);
+			const dist = 1 + Math.random() * (room - 1);
+			return {
+				angle: pick.angle,
+				tx: x + Math.cos(pick.angle) * dist,
+				tz: z + Math.sin(pick.angle) * dist
+			};
+		}
+
 		function beginWalk(explicitTarget?: { x: number; z: number }) {
+			let angle: number;
 			if (explicitTarget) {
 				targetX = explicitTarget.x;
 				targetZ = explicitTarget.z;
+				angle = Math.atan2(targetZ - z, targetX - x);
 			} else {
-				const midZ = (NEAR_Z + FAR_Z) / 2;
-				const halfDepth = (FAR_Z - NEAR_Z) / 2;
-				targetX = (Math.random() * 2 - 1) * halfWidth * ROAM_INSET;
-				targetZ = midZ + (Math.random() * 2 - 1) * halfDepth * ROAM_INSET;
+				const picked = pickCardinalWalk();
+				if (!picked) {
+					scheduleRestDecision();
+					return;
+				}
+				targetX = picked.tx;
+				targetZ = picked.tz;
+				angle = picked.angle;
 			}
 			if (Math.hypot(targetX - x, targetZ - z) < 0.5) {
 				scheduleRestDecision();
 				return;
 			}
-			moving = true;
-			playOnce('WalkStart', 0.25, () => {
-				if (moving) playLoop('Walk', 0.2);
-			});
+			const startWalking = () => {
+				moving = true;
+				playOnce('WalkStart', 0.25, () => {
+					if (moving) playLoop('Walk', 0.2);
+				});
+			};
+			if (Math.abs(normalizeAngle(angle - facingAngle)) > 0.05) {
+				turnTo(angle, startWalking);
+			} else {
+				startWalking();
+			}
 		}
 
 		function arrive() {
@@ -337,11 +367,7 @@
 						z = targetZ;
 						arrive();
 					} else {
-						heading = Math.atan2(dz, dx);
-						turnToward(heading, dt);
-						const angleDiff = Math.abs(normalizeAngle(heading - facingAngle));
-						const alignment = Math.max(0, Math.cos(angleDiff));
-						const step = Math.min(SPEED * dt * alignment, dist);
+						const step = Math.min(SPEED * dt, dist);
 						x += Math.cos(facingAngle) * step;
 						z += Math.sin(facingAngle) * step;
 					}
