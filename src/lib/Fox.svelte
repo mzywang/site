@@ -308,12 +308,82 @@
 			});
 		}
 
+		let headBone: THREE.Object3D | undefined;
+		let tailBones: THREE.Object3D[] = [];
+		let earBones: THREE.Object3D[] = [];
+
+		let idleClock = 0;
+		let nextHeadGlanceAt = 1.5 + Math.random() * 2;
+		let headTargetYaw = 0;
+		let headTargetPitch = 0;
+		let headYaw = 0;
+		let headPitch = 0;
+		const earNextTwitchAt = [1 + Math.random() * 3, 1 + Math.random() * 3];
+		const earTwitchProgress = [-1, -1];
+
+		const TAIL_SWAY_SPEED = 2.2;
+		const TAIL_SWAY_AMOUNT = THREE.MathUtils.degToRad(10);
+		const EAR_TWITCH_DURATION = 0.3;
+		const EAR_TWITCH_ANGLE = THREE.MathUtils.degToRad(18);
+		const upAxis = new THREE.Vector3(0, 1, 0);
+		const sideAxis = new THREE.Vector3(1, 0, 0);
+
+		function applyIdleMotion(dt: number) {
+			idleClock += dt;
+
+			if (headBone) {
+				if (idleClock > nextHeadGlanceAt) {
+					headTargetYaw = (Math.random() * 2 - 1) * THREE.MathUtils.degToRad(22);
+					headTargetPitch = (Math.random() * 2 - 1) * THREE.MathUtils.degToRad(10);
+					nextHeadGlanceAt = idleClock + 2.5 + Math.random() * 4;
+				}
+				const ease = Math.min(1, dt * 2);
+				headYaw += (headTargetYaw - headYaw) * ease;
+				headPitch += (headTargetPitch - headPitch) * ease;
+				headBone.quaternion.multiply(
+					new THREE.Quaternion().setFromEuler(new THREE.Euler(headPitch, headYaw, 0))
+				);
+			}
+
+			for (let i = 0; i < tailBones.length; i++) {
+				const phase = idleClock * TAIL_SWAY_SPEED - i * 0.6;
+				const angle = Math.sin(phase) * TAIL_SWAY_AMOUNT * (1 - i * 0.12);
+				tailBones[i].quaternion.multiply(new THREE.Quaternion().setFromAxisAngle(upAxis, angle));
+			}
+
+			for (let e = 0; e < earBones.length; e++) {
+				if (earTwitchProgress[e] < 0 && idleClock > earNextTwitchAt[e]) {
+					earTwitchProgress[e] = 0;
+				}
+				if (earTwitchProgress[e] >= 0) {
+					earTwitchProgress[e] += dt / EAR_TWITCH_DURATION;
+					const t = earTwitchProgress[e];
+					const curve = t < 1 ? Math.sin(Math.min(t, 1) * Math.PI) : 0;
+					earBones[e].quaternion.multiply(
+						new THREE.Quaternion().setFromAxisAngle(sideAxis, curve * EAR_TWITCH_ANGLE)
+					);
+					if (t >= 1) {
+						earTwitchProgress[e] = -1;
+						earNextTwitchAt[e] = idleClock + 2 + Math.random() * 5;
+					}
+				}
+			}
+		}
+
 		const loader = new GLTFLoader();
 		loader.load('/models/fox.glb', (gltf) => {
 			if (disposed) return;
 			fox = gltf.scene;
 			fox.scale.setScalar(MODEL_SCALE);
 			scene.add(fox);
+
+			headBone = fox.getObjectByName('Bip001-Head_09');
+			tailBones = ['RigTail1_049', 'RigTail2_050', 'RigTail3_051', 'RigTail4_052', 'RigTail5_053']
+				.map((name) => fox?.getObjectByName(name))
+				.filter((b): b is THREE.Object3D => !!b);
+			earBones = ['RigLEar1_013', 'RigREar1_010']
+				.map((name) => fox?.getObjectByName(name))
+				.filter((b): b is THREE.Object3D => !!b);
 
 			mixer = new THREE.AnimationMixer(fox);
 			for (const name of CLIP_NAMES) {
@@ -357,6 +427,7 @@
 				fox.rotation.y = -facingAngle + FORWARD_OFFSET;
 
 				mixer?.update(dt);
+				applyIdleMotion(dt);
 			}
 
 			effect.render(scene, camera);
