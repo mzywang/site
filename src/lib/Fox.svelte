@@ -273,12 +273,18 @@
 				targetZ = explicitTarget.z;
 				angle = Math.atan2(targetZ - z, targetX - x);
 			} else {
-				const picked = pickFreeRoamTarget();
+				const MIN_WALK_DIST = 3; // avoid tiny walks that end before the Walk cycle really gets going
+				let picked = pickFreeRoamTarget();
+				let attempts = 0;
+				while (Math.hypot(picked.tx - x, picked.tz - z) < MIN_WALK_DIST && attempts < 6) {
+					picked = pickFreeRoamTarget();
+					attempts++;
+				}
 				targetX = picked.tx;
 				targetZ = picked.tz;
 				angle = picked.angle;
 			}
-			if (Math.hypot(targetX - x, targetZ - z) < 0.5) {
+			if (Math.hypot(targetX - x, targetZ - z) < 1.5) {
 				scheduleRestDecision();
 				return;
 			}
