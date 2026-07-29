@@ -13,7 +13,7 @@
 	const SPEED = 0.61 * MODEL_SCALE; // world units / sec, calibrated to the Walk clip's stance-phase stride
 	const FORWARD_OFFSET = Math.PI / 2;
 	const EDGE_MARGIN = 0.98; // keep the model's own body width comfortably inside the frustum
-	const ROAM_INSET = 0.72; // shrink random-walk targets inward so the fox never reaches the boundary line
+	const ROAM_INSET = 0.5; // shrink random-walk targets inward so the fox never reaches the boundary line
 	const CAMERA_FOV_DEG = 27; // a narrow fov + distant camera flattens the depth perspective
 	const CAMERA_Z = 24;
 	const CAMERA_Y = 3.6;
