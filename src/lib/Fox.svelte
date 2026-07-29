@@ -422,10 +422,17 @@
 					const dx = targetX - x;
 					const dz = targetZ - z;
 					const dist = Math.hypot(dx, dz);
-					const desiredHeading = Math.atan2(dz, dx);
-					const angleErr = normalizeAngle(desiredHeading - facingAngle);
-					const steer = THREE.MathUtils.clamp(angleErr / MAX_BLEND_ANGLE, -1, 1);
-					facingAngle = normalizeAngle(facingAngle + steer * TURN_RATE_PER_SEC * dt);
+					// bearing-to-target steering is unstable once dx/dz get small (atan2 swings
+					// toward +-90deg as the fox's position crosses the target's line) - freeze
+					// heading correction for the final stretch and just finish straight instead
+					// of chasing that unstable bearing into a spiral.
+					let steer = 0;
+					if (dist > 1.5) {
+						const desiredHeading = Math.atan2(dz, dx);
+						const angleErr = normalizeAngle(desiredHeading - facingAngle);
+						steer = THREE.MathUtils.clamp(angleErr / MAX_BLEND_ANGLE, -1, 1);
+						facingAngle = normalizeAngle(facingAngle + steer * TURN_RATE_PER_SEC * dt);
+					}
 					setLocomotionWeights(steer);
 					moveElapsed += dt;
 					if (dist < 0.6 || moveElapsed > 20) {
