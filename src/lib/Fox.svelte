@@ -9,30 +9,27 @@
 
 	const NEAR_Z = -4;
 	const FAR_Z = 10;
-	const MODEL_SCALE = 5.175;
-	const SPEED = 0.61 * MODEL_SCALE; // world units / sec, calibrated to the Walk clip's stance-phase stride
+	const MODEL_SCALE = 0.2;
 	const FORWARD_OFFSET = Math.PI / 2;
 	const EDGE_MARGIN = 0.98; // keep the model's own body width comfortably inside the frustum
 	const ROAM_INSET = 0.5; // shrink random-walk targets inward so the fox never reaches the boundary line
 	const CAMERA_FOV_DEG = 27; // a narrow fov + distant camera flattens the depth perspective
 	const CAMERA_Z = 24;
 	const CAMERA_Y = 3.6;
+	const MAX_BLEND_ANGLE = Math.PI / 4; // Fox_Walk_Left/Right are 45-degree diagonal root-motion clips
+	const TURN_RATE_PER_SEC = Math.PI / 4; // facing rotation rate at full steer (matches the clip's own turn pace)
 
 	const CLIP_NAMES = [
-		'NeutralStand01',
-		'Walk',
-		'WalkStart',
-		'WalkStop',
-		'TurnL90',
-		'TurnR90',
-		'Sitting01',
-		'StandToSitting',
-		'SittingToStand',
-		'Lying01',
-		'StandToLying',
-		'LyingToStand'
+		'Fox_Idle',
+		'Fox_Walk',
+		'Fox_Walk_Left',
+		'Fox_Walk_Right',
+		'Fox_Sit1',
+		'Fox_Sit2_Idle',
+		'Fox_Sit3_StandUp'
 	] as const;
 	type ClipName = (typeof CLIP_NAMES)[number];
+	const LOCO_CLIPS = ['Fox_Walk', 'Fox_Walk_Left', 'Fox_Walk_Right'] as const;
 
 	onMount(() => {
 		const scene = new THREE.Scene();
@@ -126,14 +123,7 @@
 		let targetZ = z;
 		let moving = false;
 		let busy = false;
-		let turningTo: number | null = null;
-		let onTurnComplete: (() => void) | null = null;
-		let turnSegStart = 0;
-		let turnSegTarget = 0;
-		let turnSegElapsed = 0;
-		let turnSegDuration = 0.5;
-
-		const TURN_STEP = Math.PI / 2; // Fox_TurnL90 / Fox_TurnR90 each pivot exactly 90 degrees
+		let moveElapsed = 0;
 
 		function normalizeAngle(a: number) {
 			a = a % (Math.PI * 2);
@@ -180,35 +170,50 @@
 			mixerRef.addEventListener('finished', handler);
 		}
 
-		function startNextTurnSegment() {
-			if (turningTo === null) return;
-			const remaining = normalizeAngle(turningTo - facingAngle);
-			if (Math.abs(remaining) < 0.05) {
-				facingAngle = turningTo;
-				turningTo = null;
-				const done = onTurnComplete;
-				onTurnComplete = null;
-				done?.();
-				return;
+		let rootMotionNode: THREE.Object3D | undefined;
+		const lastRootMotion = new THREE.Vector3();
+
+		function extractRootMotionDelta() {
+			if (!rootMotionNode) return { dx: 0, dz: 0 };
+			const cur = rootMotionNode.position;
+			let dx = cur.x - lastRootMotion.x;
+			let dz = cur.z - lastRootMotion.z;
+			if (dz < -0.01) {
+				// the clip's own timeline looped back to its start - ignore the snap-back frame
+				dx = 0;
+				dz = 0;
 			}
-			const dir = Math.sign(remaining);
-			const step = Math.min(Math.abs(remaining), TURN_STEP);
-			turnSegStart = facingAngle;
-			turnSegTarget = facingAngle + dir * step;
-			turnSegElapsed = 0;
-			const clipName: ClipName = dir > 0 ? 'TurnR90' : 'TurnL90';
-			const action = actions[clipName];
-			turnSegDuration = action ? action.getClip().duration : 0.5;
-			playOnce(clipName, 0.2, () => {
-				facingAngle = normalizeAngle(turnSegTarget);
-				startNextTurnSegment();
-			});
+			lastRootMotion.set(cur.x, cur.y, cur.z);
+			rootMotionNode.position.set(0, 0, 0);
+			return { dx, dz };
 		}
 
-		function turnTo(target: number, onComplete?: () => void) {
-			turningTo = target;
-			onTurnComplete = onComplete ?? null;
-			startNextTurnSegment();
+		function setLocomotionWeights(steer: number) {
+			const side = Math.abs(steer);
+			actions['Fox_Walk']?.setEffectiveWeight(1 - side);
+			actions['Fox_Walk_Left']?.setEffectiveWeight(steer > 0 ? side : 0);
+			actions['Fox_Walk_Right']?.setEffectiveWeight(steer < 0 ? side : 0);
+		}
+
+		function startLocomotion() {
+			lastRootMotion.set(0, 0, 0);
+			rootMotionNode?.position.set(0, 0, 0);
+			for (const name of LOCO_CLIPS) {
+				const action = actions[name];
+				if (!action) continue;
+				action.reset();
+				action.setLoop(THREE.LoopRepeat, Infinity);
+				action.play();
+			}
+			setLocomotionWeights(0);
+			currentAction?.fadeOut(0.25);
+			currentAction = undefined;
+		}
+
+		function stopLocomotion() {
+			for (const name of LOCO_CLIPS) {
+				actions[name]?.fadeOut(0.25);
+			}
 		}
 
 		function scheduleRestDecision() {
@@ -218,22 +223,20 @@
 		function decideNext() {
 			if (moving || busy) return;
 			const r = Math.random();
-			if (r < 0.45) {
+			if (r < 0.55) {
 				beginWalk();
-			} else if (r < 0.75) {
-				goSit();
 			} else {
-				goLie();
+				goSit();
 			}
 		}
 
 		function goSit() {
-			playOnce('StandToSitting', 0.3, () => {
-				playLoop('Sitting01', 0.2);
+			playOnce('Fox_Sit1', 0.3, () => {
+				playLoop('Fox_Sit2_Idle', 0.2);
 				setTimeout(
 					() => {
-						playOnce('SittingToStand', 0.3, () => {
-							playLoop('NeutralStand01', 0.2);
+						playOnce('Fox_Sit3_StandUp', 0.3, () => {
+							playLoop('Fox_Idle', 0.2);
 							scheduleRestDecision();
 						});
 					},
@@ -242,35 +245,18 @@
 			});
 		}
 
-		function goLie() {
-			playOnce('StandToLying', 0.3, () => {
-				playLoop('Lying01', 0.2);
-				setTimeout(
-					() => {
-						playOnce('LyingToStand', 0.3, () => {
-							playLoop('NeutralStand01', 0.2);
-							scheduleRestDecision();
-						});
-					},
-					12000 + Math.random() * 20000
-				);
-			});
-		}
-
-		function pickFreeRoamTarget(): { angle: number; tx: number; tz: number } {
+		function pickFreeRoamTarget(): { tx: number; tz: number } {
 			const midZ = (NEAR_Z + FAR_Z) / 2;
 			const halfDepth = (FAR_Z - NEAR_Z) / 2;
 			const tx = (Math.random() * 2 - 1) * halfWidth * ROAM_INSET;
 			const tz = midZ + (Math.random() * 2 - 1) * halfDepth * ROAM_INSET;
-			return { angle: Math.atan2(tz - z, tx - x), tx, tz };
+			return { tx, tz };
 		}
 
 		function beginWalk(explicitTarget?: { x: number; z: number }) {
-			let angle: number;
 			if (explicitTarget) {
 				targetX = explicitTarget.x;
 				targetZ = explicitTarget.z;
-				angle = Math.atan2(targetZ - z, targetX - x);
 			} else {
 				const MIN_WALK_DIST = 3; // avoid tiny walks that end before the Walk cycle really gets going
 				let picked = pickFreeRoamTarget();
@@ -281,31 +267,21 @@
 				}
 				targetX = picked.tx;
 				targetZ = picked.tz;
-				angle = picked.angle;
 			}
 			if (Math.hypot(targetX - x, targetZ - z) < 1.5) {
 				scheduleRestDecision();
 				return;
 			}
-			const startWalking = () => {
-				moving = true;
-				playOnce('WalkStart', 0.25, () => {
-					if (moving) playLoop('Walk', 0.2);
-				});
-			};
-			if (Math.abs(normalizeAngle(angle - facingAngle)) > 0.05) {
-				turnTo(angle, startWalking);
-			} else {
-				startWalking();
-			}
+			moving = true;
+			moveElapsed = 0;
+			startLocomotion();
 		}
 
 		function arrive() {
 			moving = false;
-			playOnce('WalkStop', 0.25, () => {
-				playLoop('NeutralStand01', 0.2);
-				scheduleRestDecision();
-			});
+			stopLocomotion();
+			playLoop('Fox_Idle', 0.25);
+			scheduleRestDecision();
 		}
 
 		let headBone: THREE.Object3D | undefined;
@@ -377,20 +353,28 @@
 			fox.scale.setScalar(MODEL_SCALE);
 			scene.add(fox);
 
-			headBone = fox.getObjectByName('Bip001-Head_09');
-			tailBones = ['RigTail1_049', 'RigTail2_050', 'RigTail3_051', 'RigTail4_052', 'RigTail5_053']
+			headBone = fox.getObjectByName('Fox_Head_016');
+			tailBones = [
+				'Fox_Tail1_02',
+				'Fox_Tail2_03',
+				'Fox_Tail3_04',
+				'Fox_Tail4_05',
+				'Fox_Tail5_06',
+				'Fox_Tail6_07'
+			]
 				.map((name) => fox?.getObjectByName(name))
 				.filter((b): b is THREE.Object3D => !!b);
-			earBones = ['RigLEar1_013', 'RigREar1_010']
+			earBones = ['Fox_LEar1_018', 'Fox_REar1_020']
 				.map((name) => fox?.getObjectByName(name))
 				.filter((b): b is THREE.Object3D => !!b);
+			rootMotionNode = fox.getObjectByName('FoxTransform');
 
 			mixer = new THREE.AnimationMixer(fox);
 			for (const name of CLIP_NAMES) {
-				const clip = gltf.animations.find((a) => a.name.endsWith('|Fox_' + name));
+				const clip = gltf.animations.find((a) => a.name === name);
 				if (clip) actions[name] = mixer.clipAction(clip);
 			}
-			playLoop('NeutralStand01', 0);
+			playLoop('Fox_Idle', 0);
 			currentAction?.play();
 
 			setTimeout(scheduleRestDecision, 1000);
@@ -408,25 +392,30 @@
 					const dx = targetX - x;
 					const dz = targetZ - z;
 					const dist = Math.hypot(dx, dz);
-					if (dist < 0.15) {
-						x = targetX;
-						z = targetZ;
+					const desiredHeading = Math.atan2(dz, dx);
+					const angleErr = normalizeAngle(desiredHeading - facingAngle);
+					const steer = THREE.MathUtils.clamp(angleErr / MAX_BLEND_ANGLE, -1, 1);
+					facingAngle = normalizeAngle(facingAngle + steer * TURN_RATE_PER_SEC * dt);
+					setLocomotionWeights(steer);
+					moveElapsed += dt;
+					if (dist < 0.6 || moveElapsed > 20) {
 						arrive();
-					} else {
-						const step = Math.min(SPEED * dt, dist);
-						x += Math.cos(facingAngle) * step;
-						z += Math.sin(facingAngle) * step;
 					}
-				} else if (turningTo !== null) {
-					turnSegElapsed = Math.min(turnSegDuration, turnSegElapsed + dt);
-					const t = turnSegDuration > 0 ? turnSegElapsed / turnSegDuration : 1;
-					facingAngle = normalizeAngle(turnSegStart + (turnSegTarget - turnSegStart) * t);
 				}
 
 				fox.position.set(x, 0, z);
 				fox.rotation.y = -facingAngle + FORWARD_OFFSET;
 
 				mixer?.update(dt);
+
+				const rootDelta = extractRootMotionDelta();
+				if (rootDelta.dx !== 0 || rootDelta.dz !== 0) {
+					const worldDelta = new THREE.Vector3(rootDelta.dx, 0, rootDelta.dz);
+					worldDelta.applyAxisAngle(upAxis, -facingAngle + FORWARD_OFFSET);
+					x += worldDelta.x * MODEL_SCALE;
+					z += worldDelta.z * MODEL_SCALE;
+				}
+
 				applyIdleMotion(dt);
 			}
 
@@ -444,7 +433,7 @@
 </script>
 
 <div class="fox-stage" bind:this={container}></div>
-<p class="credit">fox model &amp; animation: AnimalMesh 3D (CC BY 4.0)</p>
+<p class="credit">fox model &amp; animation: pxltiger (CC BY 4.0)</p>
 
 <style>
 	.fox-stage {
