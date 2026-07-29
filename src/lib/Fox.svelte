@@ -306,7 +306,9 @@
 		function greetVisitor() {
 			playOnce('Alert', 0.3, () => {
 				turnTo(Math.PI / 2, () => {
-					beginWalk({ x: 0, z: FAR_Z - 1.5 });
+					const midZ = (NEAR_Z + FAR_Z) / 2;
+					const halfDepth = (FAR_Z - NEAR_Z) / 2;
+					beginWalk({ x: 0, z: midZ + halfDepth * ROAM_INSET });
 				});
 			});
 		}
