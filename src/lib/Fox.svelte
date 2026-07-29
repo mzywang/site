@@ -258,29 +258,12 @@
 			});
 		}
 
-		function pickCardinalWalk(): { angle: number; tx: number; tz: number } | null {
+		function pickFreeRoamTarget(): { angle: number; tx: number; tz: number } {
 			const midZ = (NEAR_Z + FAR_Z) / 2;
 			const halfDepth = (FAR_Z - NEAR_Z) / 2;
-			const maxX = halfWidth * ROAM_INSET;
-			const maxZ = midZ + halfDepth * ROAM_INSET;
-			const minZ = midZ - halfDepth * ROAM_INSET;
-
-			const candidates = [
-				{ angle: 0, tx: maxX, tz: z },
-				{ angle: Math.PI, tx: -maxX, tz: z },
-				{ angle: Math.PI / 2, tx: x, tz: maxZ },
-				{ angle: -Math.PI / 2, tx: x, tz: minZ }
-			].filter((c) => Math.hypot(c.tx - x, c.tz - z) > 1);
-
-			if (candidates.length === 0) return null;
-			const pick = candidates[Math.floor(Math.random() * candidates.length)];
-			const room = Math.hypot(pick.tx - x, pick.tz - z);
-			const dist = 1 + Math.random() * (room - 1);
-			return {
-				angle: pick.angle,
-				tx: x + Math.cos(pick.angle) * dist,
-				tz: z + Math.sin(pick.angle) * dist
-			};
+			const tx = (Math.random() * 2 - 1) * halfWidth * ROAM_INSET;
+			const tz = midZ + (Math.random() * 2 - 1) * halfDepth * ROAM_INSET;
+			return { angle: Math.atan2(tz - z, tx - x), tx, tz };
 		}
 
 		function beginWalk(explicitTarget?: { x: number; z: number }) {
@@ -290,11 +273,7 @@
 				targetZ = explicitTarget.z;
 				angle = Math.atan2(targetZ - z, targetX - x);
 			} else {
-				const picked = pickCardinalWalk();
-				if (!picked) {
-					scheduleRestDecision();
-					return;
-				}
+				const picked = pickFreeRoamTarget();
 				targetX = picked.tx;
 				targetZ = picked.tz;
 				angle = picked.angle;
