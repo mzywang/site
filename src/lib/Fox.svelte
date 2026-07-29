@@ -205,7 +205,7 @@
 			turnSegStart = facingAngle;
 			turnSegTarget = facingAngle + dir * step;
 			turnSegElapsed = 0;
-			const clipName: ClipName = dir > 0 ? 'TurnL90' : 'TurnR90';
+			const clipName: ClipName = dir > 0 ? 'TurnR90' : 'TurnL90';
 			const action = actions[clipName];
 			turnSegDuration = action ? action.getClip().duration : 0.5;
 			playOnce(clipName, 0.2, () => {
