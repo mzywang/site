@@ -176,6 +176,7 @@
 
 		let rootMotionNode: THREE.Object3D | undefined;
 		const lastRootMotion = new THREE.Vector3();
+		const rootRestQuat = new THREE.Quaternion();
 
 		function extractRootMotionDelta() {
 			if (!rootMotionNode) return { dx: 0, dz: 0 };
@@ -189,6 +190,9 @@
 			}
 			lastRootMotion.set(cur.x, cur.y, cur.z);
 			rootMotionNode.position.set(0, 0, 0);
+			// WalkL/WalkR bake their own root rotation, which would fight with our own
+			// facingAngle-driven rotation on the outer fox object - cancel it back to rest.
+			rootMotionNode.quaternion.copy(rootRestQuat);
 			return { dx, dz };
 		}
 
@@ -308,6 +312,9 @@
 		let headBone: THREE.Object3D | undefined;
 		let tailBones: THREE.Object3D[] = [];
 		let earBones: THREE.Object3D[] = [];
+		const headRestQuat = new THREE.Quaternion();
+		let tailRestQuats: THREE.Quaternion[] = [];
+		let earRestQuats: THREE.Quaternion[] = [];
 
 		let idleClock = 0;
 		let nextHeadGlanceAt = 1.5 + Math.random() * 2;
@@ -337,15 +344,17 @@
 				const ease = Math.min(1, dt * 2);
 				headYaw += (headTargetYaw - headYaw) * ease;
 				headPitch += (headTargetPitch - headPitch) * ease;
-				headBone.quaternion.multiply(
-					new THREE.Quaternion().setFromEuler(new THREE.Euler(headPitch, headYaw, 0))
-				);
+				headBone.quaternion
+					.copy(headRestQuat)
+					.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(headPitch, headYaw, 0)));
 			}
 
 			for (let i = 0; i < tailBones.length; i++) {
 				const phase = idleClock * TAIL_SWAY_SPEED - i * 0.6;
 				const angle = Math.sin(phase) * TAIL_SWAY_AMOUNT * (1 - i * 0.12);
-				tailBones[i].quaternion.multiply(new THREE.Quaternion().setFromAxisAngle(upAxis, angle));
+				tailBones[i].quaternion
+					.copy(tailRestQuats[i])
+					.multiply(new THREE.Quaternion().setFromAxisAngle(upAxis, angle));
 			}
 
 			for (let e = 0; e < earBones.length; e++) {
@@ -356,13 +365,15 @@
 					earTwitchProgress[e] += dt / EAR_TWITCH_DURATION;
 					const t = earTwitchProgress[e];
 					const curve = t < 1 ? Math.sin(Math.min(t, 1) * Math.PI) : 0;
-					earBones[e].quaternion.multiply(
-						new THREE.Quaternion().setFromAxisAngle(sideAxis, curve * EAR_TWITCH_ANGLE)
-					);
+					earBones[e].quaternion
+						.copy(earRestQuats[e])
+						.multiply(new THREE.Quaternion().setFromAxisAngle(sideAxis, curve * EAR_TWITCH_ANGLE));
 					if (t >= 1) {
 						earTwitchProgress[e] = -1;
 						earNextTwitchAt[e] = idleClock + 2 + Math.random() * 5;
 					}
+				} else {
+					earBones[e].quaternion.copy(earRestQuats[e]);
 				}
 			}
 		}
@@ -382,6 +393,11 @@
 				.map((name) => fox?.getObjectByName(name))
 				.filter((b): b is THREE.Object3D => !!b);
 			rootMotionNode = fox.getObjectByName('RigRoot_01');
+
+			if (headBone) headRestQuat.copy(headBone.quaternion);
+			tailRestQuats = tailBones.map((b) => b.quaternion.clone());
+			earRestQuats = earBones.map((b) => b.quaternion.clone());
+			if (rootMotionNode) rootRestQuat.copy(rootMotionNode.quaternion);
 
 			mixer = new THREE.AnimationMixer(fox);
 			for (const name of CLIP_NAMES) {
