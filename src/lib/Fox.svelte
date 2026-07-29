@@ -24,6 +24,8 @@
 		'Walk',
 		'WalkStart',
 		'WalkStop',
+		'TurnL90',
+		'TurnR90',
 		'Sitting01',
 		'StandToSitting',
 		'SittingToStand',
@@ -128,8 +130,13 @@
 		let busy = false;
 		let turningTo: number | null = null;
 		let onTurnComplete: (() => void) | null = null;
+		let turnSegStart = 0;
+		let turnSegTarget = 0;
+		let turnSegElapsed = 0;
+		let turnSegDuration = 0.5;
 
-		const TURN_SHARPNESS = 5; // exponential ease-out rate for turning, per second
+		const TURN_SHARPNESS = 5; // exponential ease-out rate for the walk-realignment turn, per second
+		const TURN_STEP = Math.PI / 2; // Fox_TurnL90 / Fox_TurnR90 each pivot exactly 90 degrees
 
 		function normalizeAngle(a: number) {
 			a = a % (Math.PI * 2);
@@ -142,11 +149,6 @@
 			const diff = normalizeAngle(target - facingAngle);
 			const factor = 1 - Math.exp(-TURN_SHARPNESS * dt);
 			facingAngle = normalizeAngle(facingAngle + diff * factor);
-		}
-
-		function turnTo(target: number, onComplete?: () => void) {
-			turningTo = target;
-			onTurnComplete = onComplete ?? null;
 		}
 
 		let fox: THREE.Object3D | undefined;
@@ -185,6 +187,37 @@
 				onDone();
 			};
 			mixerRef.addEventListener('finished', handler);
+		}
+
+		function startNextTurnSegment() {
+			if (turningTo === null) return;
+			const remaining = normalizeAngle(turningTo - facingAngle);
+			if (Math.abs(remaining) < 0.05) {
+				facingAngle = turningTo;
+				turningTo = null;
+				const done = onTurnComplete;
+				onTurnComplete = null;
+				done?.();
+				return;
+			}
+			const dir = Math.sign(remaining);
+			const step = Math.min(Math.abs(remaining), TURN_STEP);
+			turnSegStart = facingAngle;
+			turnSegTarget = facingAngle + dir * step;
+			turnSegElapsed = 0;
+			const clipName: ClipName = dir > 0 ? 'TurnL90' : 'TurnR90';
+			const action = actions[clipName];
+			turnSegDuration = action ? action.getClip().duration : 0.5;
+			playOnce(clipName, 0.2, () => {
+				facingAngle = normalizeAngle(turnSegTarget);
+				startNextTurnSegment();
+			});
+		}
+
+		function turnTo(target: number, onComplete?: () => void) {
+			turningTo = target;
+			onTurnComplete = onComplete ?? null;
+			startNextTurnSegment();
 		}
 
 		function scheduleRestDecision() {
@@ -263,7 +296,6 @@
 
 		function greetVisitor() {
 			playOnce('Alert', 0.3, () => {
-				playLoop('Walk', 0.25);
 				turnTo(Math.PI / 2, () => {
 					beginWalk({ x: 0, z: FAR_Z - 1.5 });
 				});
@@ -314,14 +346,9 @@
 						z += Math.sin(facingAngle) * step;
 					}
 				} else if (turningTo !== null) {
-					turnToward(turningTo, dt);
-					if (Math.abs(normalizeAngle(turningTo - facingAngle)) < 0.03) {
-						facingAngle = turningTo;
-						turningTo = null;
-						const done = onTurnComplete;
-						onTurnComplete = null;
-						done?.();
-					}
+					turnSegElapsed = Math.min(turnSegDuration, turnSegElapsed + dt);
+					const t = turnSegDuration > 0 ? turnSegElapsed / turnSegDuration : 1;
+					facingAngle = normalizeAngle(turnSegStart + (turnSegTarget - turnSegStart) * t);
 				}
 
 				fox.position.set(x, 0, z);
