@@ -9,27 +9,31 @@
 
 	const NEAR_Z = -4;
 	const FAR_Z = 10;
-	const MODEL_SCALE = 0.2;
+	const MODEL_SCALE = 2.84;
+	const ROOT_MOTION_SCALE = 0.03; // this rig's root-motion translation is authored in a much larger unit space than the mesh
 	const FORWARD_OFFSET = Math.PI / 2;
 	const EDGE_MARGIN = 0.98; // keep the model's own body width comfortably inside the frustum
 	const ROAM_INSET = 0.5; // shrink random-walk targets inward so the fox never reaches the boundary line
 	const CAMERA_FOV_DEG = 27; // a narrow fov + distant camera flattens the depth perspective
 	const CAMERA_Z = 24;
 	const CAMERA_Y = 3.6;
-	const MAX_BLEND_ANGLE = Math.PI / 4; // Fox_Walk_Left/Right are 45-degree diagonal root-motion clips
-	const TURN_RATE_PER_SEC = Math.PI / 4; // facing rotation rate at full steer (matches the clip's own turn pace)
+	const MAX_BLEND_ANGLE = Math.PI / 4; // steer blend range between straight Walk and WalkL/WalkR
+	const TURN_RATE_PER_SEC = Math.PI / 4; // facing rotation rate at full steer
 
 	const CLIP_NAMES = [
-		'Fox_Idle',
-		'Fox_Walk',
-		'Fox_Walk_Left',
-		'Fox_Walk_Right',
-		'Fox_Sit1',
-		'Fox_Sit2_Idle',
-		'Fox_Sit3_StandUp'
+		'A3_Stand_Idle_01',
+		'Loco_Walk',
+		'WalkL',
+		'WalkR',
+		'Trans_Stand_to_Sitting',
+		'Sitting_Idle_01',
+		'Trans_Sitting_to_Stand',
+		'Trans_Stand_to_Lying',
+		'Lying_Idle_01',
+		'Trans_Lying_to_Stand'
 	] as const;
 	type ClipName = (typeof CLIP_NAMES)[number];
-	const LOCO_CLIPS = ['Fox_Walk', 'Fox_Walk_Left', 'Fox_Walk_Right'] as const;
+	const LOCO_CLIPS = ['Loco_Walk', 'WalkL', 'WalkR'] as const;
 
 	onMount(() => {
 		const scene = new THREE.Scene();
@@ -190,9 +194,9 @@
 
 		function setLocomotionWeights(steer: number) {
 			const side = Math.abs(steer);
-			actions['Fox_Walk']?.setEffectiveWeight(1 - side);
-			actions['Fox_Walk_Left']?.setEffectiveWeight(steer > 0 ? side : 0);
-			actions['Fox_Walk_Right']?.setEffectiveWeight(steer < 0 ? side : 0);
+			actions['Loco_Walk']?.setEffectiveWeight(1 - side);
+			actions['WalkL']?.setEffectiveWeight(steer > 0 ? side : 0);
+			actions['WalkR']?.setEffectiveWeight(steer < 0 ? side : 0);
 		}
 
 		function startLocomotion() {
@@ -223,24 +227,41 @@
 		function decideNext() {
 			if (moving || busy) return;
 			const r = Math.random();
-			if (r < 0.55) {
+			if (r < 0.45) {
 				beginWalk();
-			} else {
+			} else if (r < 0.75) {
 				goSit();
+			} else {
+				goLie();
 			}
 		}
 
 		function goSit() {
-			playOnce('Fox_Sit1', 0.3, () => {
-				playLoop('Fox_Sit2_Idle', 0.2);
+			playOnce('Trans_Stand_to_Sitting', 0.3, () => {
+				playLoop('Sitting_Idle_01', 0.2);
 				setTimeout(
 					() => {
-						playOnce('Fox_Sit3_StandUp', 0.3, () => {
-							playLoop('Fox_Idle', 0.2);
+						playOnce('Trans_Sitting_to_Stand', 0.3, () => {
+							playLoop('A3_Stand_Idle_01', 0.2);
 							scheduleRestDecision();
 						});
 					},
 					3000 + Math.random() * 5000
+				);
+			});
+		}
+
+		function goLie() {
+			playOnce('Trans_Stand_to_Lying', 0.3, () => {
+				playLoop('Lying_Idle_01', 0.2);
+				setTimeout(
+					() => {
+						playOnce('Trans_Lying_to_Stand', 0.3, () => {
+							playLoop('A3_Stand_Idle_01', 0.2);
+							scheduleRestDecision();
+						});
+					},
+					12000 + Math.random() * 20000
 				);
 			});
 		}
@@ -280,7 +301,7 @@
 		function arrive() {
 			moving = false;
 			stopLocomotion();
-			playLoop('Fox_Idle', 0.25);
+			playLoop('A3_Stand_Idle_01', 0.25);
 			scheduleRestDecision();
 		}
 
@@ -353,28 +374,21 @@
 			fox.scale.setScalar(MODEL_SCALE);
 			scene.add(fox);
 
-			headBone = fox.getObjectByName('Fox_Head_016');
-			tailBones = [
-				'Fox_Tail1_02',
-				'Fox_Tail2_03',
-				'Fox_Tail3_04',
-				'Fox_Tail4_05',
-				'Fox_Tail5_06',
-				'Fox_Tail6_07'
-			]
+			headBone = fox.getObjectByName('RigHead_020');
+			tailBones = ['RigTail1_034', 'RigTail2_035', 'RigTail3_036', 'RigTail4_037', 'RigTail5_038']
 				.map((name) => fox?.getObjectByName(name))
 				.filter((b): b is THREE.Object3D => !!b);
-			earBones = ['Fox_LEar1_018', 'Fox_REar1_020']
+			earBones = ['RigLEar1_025', 'RigREar1_027']
 				.map((name) => fox?.getObjectByName(name))
 				.filter((b): b is THREE.Object3D => !!b);
-			rootMotionNode = fox.getObjectByName('FoxTransform');
+			rootMotionNode = fox.getObjectByName('RigRoot_01');
 
 			mixer = new THREE.AnimationMixer(fox);
 			for (const name of CLIP_NAMES) {
 				const clip = gltf.animations.find((a) => a.name === name);
 				if (clip) actions[name] = mixer.clipAction(clip);
 			}
-			playLoop('Fox_Idle', 0);
+			playLoop('A3_Stand_Idle_01', 0);
 			currentAction?.play();
 
 			setTimeout(scheduleRestDecision, 1000);
@@ -412,8 +426,8 @@
 				if (rootDelta.dx !== 0 || rootDelta.dz !== 0) {
 					const worldDelta = new THREE.Vector3(rootDelta.dx, 0, rootDelta.dz);
 					worldDelta.applyAxisAngle(upAxis, -facingAngle + FORWARD_OFFSET);
-					x += worldDelta.x * MODEL_SCALE;
-					z += worldDelta.z * MODEL_SCALE;
+					x += worldDelta.x * ROOT_MOTION_SCALE;
+					z += worldDelta.z * ROOT_MOTION_SCALE;
 				}
 
 				applyIdleMotion(dt);
@@ -433,7 +447,7 @@
 </script>
 
 <div class="fox-stage" bind:this={container}></div>
-<p class="credit">fox model &amp; animation: pxltiger (CC BY 4.0)</p>
+<p class="credit">fox model &amp; animation: AnimalMesh 3D (CC BY 4.0)</p>
 
 <style>
 	.fox-stage {
