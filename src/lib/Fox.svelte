@@ -20,7 +20,6 @@
 
 	const CLIP_NAMES = [
 		'NeutralStand01',
-		'Alert',
 		'Walk',
 		'WalkStart',
 		'WalkStop',
@@ -309,16 +308,6 @@
 			});
 		}
 
-		function greetVisitor() {
-			playOnce('Alert', 0.3, () => {
-				turnTo(Math.PI / 2, () => {
-					const midZ = (NEAR_Z + FAR_Z) / 2;
-					const halfDepth = (FAR_Z - NEAR_Z) / 2;
-					beginWalk({ x: 0, z: midZ + halfDepth * ROAM_INSET });
-				});
-			});
-		}
-
 		const loader = new GLTFLoader();
 		loader.load('/models/fox.glb', (gltf) => {
 			if (disposed) return;
@@ -334,7 +323,7 @@
 			playLoop('NeutralStand01', 0);
 			currentAction?.play();
 
-			setTimeout(greetVisitor, 2000 + Math.random() * 1500);
+			setTimeout(scheduleRestDecision, 1000);
 		});
 
 		let last = performance.now();
