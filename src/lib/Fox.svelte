@@ -9,7 +9,7 @@
 
 	const NEAR_Z = -4;
 	const FAR_Z = 10;
-	const MODEL_SCALE = 3.45;
+	const MODEL_SCALE = 6.9;
 	const SPEED = 0.61 * MODEL_SCALE; // world units / sec, calibrated to the Walk clip's stance-phase stride
 	const FORWARD_OFFSET = Math.PI / 2;
 	const EDGE_MARGIN = 0.98; // keep the model's own body width comfortably inside the frustum
