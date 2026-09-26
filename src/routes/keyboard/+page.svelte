@@ -1,43 +1,77 @@
 <script lang="ts">
 	// Colemak-DH as set up in the dotfiles' kanata config (builtin_cmd_tab.kbd):
-	// ' on the p key and ; on the key right of l, on an ANSI-shaped board.
-	type Special = 'bspc' | 'tab' | 'ret' | 'shift' | 'spc' | 'gap';
-	type Key =
-		| { id: string; kind: 'char'; base: string; shifted: string; w?: number }
-		| { id: string; kind: Special; label?: string; w: number };
-
-	// Pairs of unshifted/shifted characters, e.g. "1!" or "aA".
-	function chars(pairs: string): Key[] {
-		const keys: Key[] = [];
-		for (let i = 0; i < pairs.length; i += 2) {
-			keys.push({ id: pairs[i], kind: 'char', base: pairs[i], shifted: pairs[i + 1] });
-		}
-		return keys;
+	// ' on the p key and ; on the key right of l, laid out as a Corne-style
+	// split: 3x6 per half with column stagger, plus a thumb cluster.
+	type Kind = 'char' | 'shift' | 'esc' | 'spc' | 'tab' | 'ret' | 'bspc' | 'blank';
+	interface Key {
+		id: string;
+		kind: Kind;
+		base?: string;
+		shifted?: string;
+		label?: string;
+		// Position in key widths from the top left of the board.
+		x: number;
+		y: number;
 	}
 
-	// Each row adds up to 15 key widths.
-	const rows: Key[][] = [
-		[...chars('`~1!2@3#4$5%6^7&8*9(0)-_=+'), { id: 'bspc', kind: 'bspc', label: 'del', w: 2 }],
-		[
-			{ id: 'tab', kind: 'tab', label: 'tab', w: 1.5 },
-			...chars(`qQwWfFpPbBjJlLuUyY'"[{]}`),
-			{ id: '\\', kind: 'char', base: '\\', shifted: '|', w: 1.5 }
-		],
-		[
-			{ id: 'caps', kind: 'gap', w: 1.75 },
-			...chars('aArRsStTgGmMnNeEiIoO;:'),
-			{ id: 'ret', kind: 'ret', label: 'ret', w: 2.25 }
-		],
-		[
-			{ id: 'lsft', kind: 'shift', label: 'shift', w: 2.25 },
-			...chars('zZxXcCdDvVkKhH,<.>/?'),
-			{ id: 'rsft', kind: 'shift', label: 'shift', w: 2.75 }
-		],
-		[
-			{ id: 'gap-l', kind: 'gap', w: 4.375 },
-			{ id: 'spc', kind: 'spc', w: 6.25 },
-			{ id: 'gap-r', kind: 'gap', w: 4.375 }
-		]
+	// A cell is an unshifted/shifted pair like "aA", a special key's name, or
+	// '' for a blank position.
+	const left = [
+		['', 'qQ', 'wW', 'fF', 'pP', 'bB'],
+		['', 'aA', 'rR', 'sS', 'tT', 'gG'],
+		['shift', 'zZ', 'xX', 'cC', 'dD', 'vV']
+	];
+	const right = [
+		['jJ', 'lL', 'uU', 'yY', `'"`, '[{'],
+		['mM', 'nN', 'eE', 'iI', 'oO', ';:'],
+		['kK', 'hH', ',<', '.>', '/?', 'shift']
+	];
+
+	// How far each column sits below the middle finger's, outer column first.
+	const stagger = [0.5, 0.5, 0.125, 0, 0.125, 0.25];
+	// Gap between the halves, in key widths.
+	const split = 2;
+	const width = 6 + split + 6;
+	const thumbY = 3.5;
+	const height = thumbY + 1;
+
+	const labels: Partial<Record<Kind, string>> = {
+		shift: 'shift',
+		esc: 'esc',
+		spc: 'space',
+		tab: 'tab',
+		ret: 'ret',
+		bspc: 'del'
+	};
+
+	function cell(id: string, text: string, x: number, y: number): Key {
+		if (text === '') return { id, kind: 'blank', x, y };
+		if (text.length === 2) return { id, kind: 'char', base: text[0], shifted: text[1], x, y };
+		return { id, kind: text as Kind, x, y };
+	}
+
+	function thumb(kind: Kind, x: number): Key {
+		return { id: kind, kind, x, y: thumbY };
+	}
+
+	function half(side: string, rows: string[][], x0: number, stag: number[]): Key[] {
+		const out: Key[] = [];
+		rows.forEach((row, r) => {
+			row.forEach((text, c) => out.push(cell(`${side}${r}${c}`, text, x0 + c, r + stag[c])));
+		});
+		return out;
+	}
+
+	const keys: Key[] = [
+		...half('l', left, 0, stagger),
+		// The right half mirrors the left, so its stagger runs the other way.
+		...half('r', right, 6 + split, [...stagger].reverse()),
+		// Left to right: esc, space, tab | ret, del.
+		thumb('esc', 3.5),
+		thumb('spc', 4.5),
+		thumb('tab', 5.5),
+		thumb('ret', width - 6.5),
+		thumb('bspc', width - 5.5)
 	];
 
 	let output = $state('');
@@ -46,7 +80,7 @@
 	// Pointers currently down on each key. iOS Safari applies :active to only
 	// one element at a time, so the pressed look is driven from this instead.
 	let down = $state<Record<string, number[]>>({});
-	let shift = $derived(!!(down.lsft?.length || down.rsft?.length));
+	let shift = $derived(keys.some((k) => k.kind === 'shift' && down[k.id]?.length));
 
 	function isDown(key: Key) {
 		return (down[key.id]?.length ?? 0) > 0 || (key.kind === 'shift' && shift);
@@ -54,7 +88,7 @@
 
 	function label(key: Key) {
 		if (key.kind === 'char') return shift ? key.shifted : key.base;
-		return key.label ?? '';
+		return labels[key.kind] ?? '';
 	}
 
 	function type(key: Key) {
@@ -106,39 +140,37 @@
 	<textarea bind:this={box} value={output} readonly rows="4" aria-label="output"></textarea>
 
 	<div class="keyboard">
-		{#each rows as row, r (r)}
-			<div class="row">
-				{#each row as key (key.id)}
-					{#if key.kind === 'gap'}
-						<span style:flex-grow={key.w}></span>
-					{:else}
-						<button
-							type="button"
-							style:flex-grow={key.w ?? 1}
-							class:pressed={isDown(key)}
-							class:mod={key.kind !== 'char'}
-							aria-label={key.kind === 'spc' ? 'space' : undefined}
-							onpointerdown={press(key)}
-							onpointerup={release(key)}
-							onpointercancel={release(key)}
-							onpointerleave={release(key)}
-						>
-							{label(key)}
-						</button>
-					{/if}
-				{/each}
-			</div>
-		{/each}
+		<div class="board" style:--cols={width} style:--rows={height}>
+			{#each keys as key (key.id)}
+				{#if key.kind === 'blank'}
+					<span class="key blank" style:--x={key.x} style:--y={key.y}></span>
+				{:else}
+					<button
+						type="button"
+						class="key"
+						class:pressed={isDown(key)}
+						class:mod={key.kind !== 'char'}
+						style:--x={key.x}
+						style:--y={key.y}
+						onpointerdown={press(key)}
+						onpointerup={release(key)}
+						onpointercancel={release(key)}
+						onpointerleave={release(key)}
+					>
+						{label(key)}
+					</button>
+				{/if}
+			{/each}
+		</div>
 	</div>
 </div>
 
 <style>
 	.wide {
-		--gap: 0.35rem;
 		position: relative;
 		left: 50%;
 		transform: translateX(-50%);
-		width: min(calc(100vw - 2.5rem), 54rem);
+		width: min(calc(100vw - 2.5rem), 60rem);
 	}
 
 	textarea {
@@ -162,32 +194,38 @@
 
 	.keyboard {
 		container-type: inline-size;
-		display: flex;
-		flex-direction: column;
-		gap: var(--gap);
 		margin-top: 1.25rem;
 	}
 
-	.row {
-		display: flex;
-		gap: var(--gap);
+	.board {
+		/* One key width, including the gap around it. */
+		--u: calc(100cqw / var(--cols));
+		--gap: calc(var(--u) * 0.08);
+		position: relative;
+		height: calc(var(--u) * var(--rows));
 	}
 
-	.row > * {
-		flex-basis: 0;
-		min-width: 0;
-	}
-
-	button {
-		/* One key width: the row is 15 of them plus 14 gaps. */
-		height: calc((100cqw - 14 * var(--gap)) / 15);
+	.key {
+		position: absolute;
+		left: calc(var(--x) * var(--u) + var(--gap) / 2);
+		top: calc(var(--y) * var(--u) + var(--gap) / 2);
+		width: calc(var(--u) - var(--gap));
+		height: calc(var(--u) - var(--gap));
 		padding: 0;
 		border: 1px solid var(--ink);
 		border-radius: 0;
 		background: transparent;
 		color: var(--ink);
 		font: inherit;
-		font-size: clamp(0.8rem, 3.2cqw, 1.4rem);
+		font-size: calc(var(--u) * 0.4);
+	}
+
+	.blank {
+		border: 1px dashed var(--ink-dim);
+		opacity: 0.5;
+	}
+
+	button {
 		cursor: pointer;
 		/* No double-tap zoom, text selection or callout while tapping quickly. */
 		touch-action: none;
@@ -199,7 +237,7 @@
 
 	button.mod {
 		color: var(--ink-dim);
-		font-size: clamp(0.6rem, 1.8cqw, 0.9rem);
+		font-size: calc(var(--u) * 0.22);
 	}
 
 	button.pressed {
