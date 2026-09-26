@@ -7,7 +7,7 @@
 	let { children } = $props();
 
 	// Shown after "mzywang /" in the header on subpages.
-	const sections: Record<string, string> = { '/log': 'eng log', '/binary': 'binary' };
+	const sections: Record<string, string> = { '/log': 'eng log', '/keyboard': 'keyboard' };
 	let section = $derived(page.route.id ? sections[page.route.id] : undefined);
 </script>
 
