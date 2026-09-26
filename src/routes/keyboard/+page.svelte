@@ -1,42 +1,29 @@
 <script lang="ts">
-	// Colemak-DH as set up in the dotfiles' kanata config (builtin_cmd_tab.kbd):
-	// ' on the p key and ; on the key right of l, laid out as a Corne-style
-	// split: 3x6 per half with column stagger, plus a thumb cluster.
-	type Kind = 'char' | 'shift' | 'esc' | 'spc' | 'tab' | 'ret' | 'bspc' | 'blank';
+	// Colemak-DH as set up in the dotfiles' kanata config (builtin_cmd_tab.kbd),
+	// laid out as a Corne-style split without the outer columns: 3x5 per half
+	// with column stagger, plus thumb keys.
+	type Kind = 'char' | 'esc' | 'spc' | 'tab' | 'ret' | 'bspc';
 	interface Key {
 		id: string;
 		kind: Kind;
-		base?: string;
-		shifted?: string;
-		label?: string;
+		char?: string;
 		// Position in key widths from the top left of the board.
 		x: number;
 		y: number;
 	}
 
-	// A cell is an unshifted/shifted pair like "aA", a special key's name, or
-	// '' for a blank position.
-	const left = [
-		['', 'qQ', 'wW', 'fF', 'pP', 'bB'],
-		['', 'aA', 'rR', 'sS', 'tT', 'gG'],
-		['shift', 'zZ', 'xX', 'cC', 'dD', 'vV']
-	];
-	const right = [
-		['jJ', 'lL', 'uU', 'yY', `'"`, '[{'],
-		['mM', 'nN', 'eE', 'iI', 'oO', ';:'],
-		['kK', 'hH', ',<', '.>', '/?', 'shift']
-	];
+	const left = ['qwfpb', 'arstg', 'zxcdv'];
+	const right = [`jluy'`, 'mneio', 'kh,./'];
 
-	// How far each column sits below the middle finger's, outer column first.
-	const stagger = [0.5, 0.5, 0.125, 0, 0.125, 0.25];
+	// How far each column sits below the middle finger's, pinky column first.
+	const stagger = [0.5, 0.125, 0, 0.125, 0.25];
 	// Gap between the halves, in key widths.
 	const split = 2;
-	const width = 6 + split + 6;
+	const width = 5 + split + 5;
 	const thumbY = 3.5;
 	const height = thumbY + 1;
 
-	const labels: Partial<Record<Kind, string>> = {
-		shift: 'shift',
+	const labels: Record<Exclude<Kind, 'char'>, string> = {
 		esc: 'esc',
 		spc: 'space',
 		tab: 'tab',
@@ -44,34 +31,30 @@
 		bspc: 'del'
 	};
 
-	function cell(id: string, text: string, x: number, y: number): Key {
-		if (text === '') return { id, kind: 'blank', x, y };
-		if (text.length === 2) return { id, kind: 'char', base: text[0], shifted: text[1], x, y };
-		return { id, kind: text as Kind, x, y };
+	function half(rows: string[], x0: number, stag: number[]): Key[] {
+		const out: Key[] = [];
+		rows.forEach((row, r) => {
+			[...row].forEach((char, c) => {
+				out.push({ id: char, kind: 'char', char, x: x0 + c, y: r + stag[c] });
+			});
+		});
+		return out;
 	}
 
 	function thumb(kind: Kind, x: number): Key {
 		return { id: kind, kind, x, y: thumbY };
 	}
 
-	function half(side: string, rows: string[][], x0: number, stag: number[]): Key[] {
-		const out: Key[] = [];
-		rows.forEach((row, r) => {
-			row.forEach((text, c) => out.push(cell(`${side}${r}${c}`, text, x0 + c, r + stag[c])));
-		});
-		return out;
-	}
-
 	const keys: Key[] = [
-		...half('l', left, 0, stagger),
+		...half(left, 0, stagger),
 		// The right half mirrors the left, so its stagger runs the other way.
-		...half('r', right, 6 + split, [...stagger].reverse()),
+		...half(right, 5 + split, [...stagger].reverse()),
 		// Left to right: esc, space, tab | ret, del.
-		thumb('esc', 3.5),
-		thumb('spc', 4.5),
-		thumb('tab', 5.5),
-		thumb('ret', width - 6.5),
-		thumb('bspc', width - 5.5)
+		thumb('esc', 2.5),
+		thumb('spc', 3.5),
+		thumb('tab', 4.5),
+		thumb('ret', width - 5.5),
+		thumb('bspc', width - 4.5)
 	];
 
 	let output = $state('');
@@ -80,21 +63,19 @@
 	// Pointers currently down on each key. iOS Safari applies :active to only
 	// one element at a time, so the pressed look is driven from this instead.
 	let down = $state<Record<string, number[]>>({});
-	let shift = $derived(keys.some((k) => k.kind === 'shift' && down[k.id]?.length));
 
 	function isDown(key: Key) {
-		return (down[key.id]?.length ?? 0) > 0 || (key.kind === 'shift' && shift);
+		return (down[key.id]?.length ?? 0) > 0;
 	}
 
 	function label(key: Key) {
-		if (key.kind === 'char') return shift ? key.shifted : key.base;
-		return labels[key.kind] ?? '';
+		return key.kind === 'char' ? key.char : labels[key.kind];
 	}
 
 	function type(key: Key) {
 		switch (key.kind) {
 			case 'char':
-				output += shift ? key.shifted : key.base;
+				output += key.char;
 				break;
 			case 'bspc':
 				output = output.slice(0, -1);
@@ -112,7 +93,7 @@
 	}
 
 	// pointerdown instead of click: fires on touch without waiting for release,
-	// and each finger is its own pointer, so shift can be held while typing.
+	// and each finger is its own pointer, so several keys can be held at once.
 	function press(key: Key) {
 		return (e: PointerEvent) => {
 			e.preventDefault();
@@ -142,24 +123,20 @@
 	<div class="keyboard">
 		<div class="board" style:--cols={width} style:--rows={height}>
 			{#each keys as key (key.id)}
-				{#if key.kind === 'blank'}
-					<span class="key blank" style:--x={key.x} style:--y={key.y}></span>
-				{:else}
-					<button
-						type="button"
-						class="key"
-						class:pressed={isDown(key)}
-						class:mod={key.kind !== 'char'}
-						style:--x={key.x}
-						style:--y={key.y}
-						onpointerdown={press(key)}
-						onpointerup={release(key)}
-						onpointercancel={release(key)}
-						onpointerleave={release(key)}
-					>
-						{label(key)}
-					</button>
-				{/if}
+				<button
+					type="button"
+					class="key"
+					class:pressed={isDown(key)}
+					class:mod={key.kind !== 'char'}
+					style:--x={key.x}
+					style:--y={key.y}
+					onpointerdown={press(key)}
+					onpointerup={release(key)}
+					onpointercancel={release(key)}
+					onpointerleave={release(key)}
+				>
+					{label(key)}
+				</button>
 			{/each}
 		</div>
 	</div>
@@ -218,11 +195,6 @@
 		color: var(--ink);
 		font: inherit;
 		font-size: calc(var(--u) * 0.4);
-	}
-
-	.blank {
-		border: 1px dashed var(--ink-dim);
-		opacity: 0.5;
 	}
 
 	button {
