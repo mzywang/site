@@ -1,15 +1,29 @@
 <script lang="ts">
+	type Bit = '0' | '1';
+	const bits: Bit[] = ['0', '1'];
+
 	let output = $state('');
 	let box: HTMLTextAreaElement;
 
+	// Pointers currently down on each key. iOS Safari applies :active to only
+	// one element at a time, so the pressed look is driven from this instead.
+	let down = $state<Record<Bit, number[]>>({ '0': [], '1': [] });
+
 	// pointerdown instead of click: fires on touch without waiting for release,
 	// and each finger is its own pointer, so both keys can be pressed at once.
-	function press(bit: '0' | '1') {
+	function press(bit: Bit) {
 		return (e: PointerEvent) => {
 			e.preventDefault();
+			down[bit].push(e.pointerId);
 			output += bit;
 			// Keep the newest bits in view once the box starts scrolling.
 			requestAnimationFrame(() => (box.scrollTop = box.scrollHeight));
+		};
+	}
+
+	function release(bit: Bit) {
+		return (e: PointerEvent) => {
+			down[bit] = down[bit].filter((id) => id !== e.pointerId);
 		};
 	}
 </script>
@@ -22,8 +36,16 @@
 <textarea bind:this={box} value={output} readonly rows="4" aria-label="output"></textarea>
 
 <div class="keys">
-	<button type="button" onpointerdown={press('0')}>0</button>
-	<button type="button" onpointerdown={press('1')}>1</button>
+	{#each bits as bit (bit)}
+		<button
+			type="button"
+			class:pressed={down[bit].length > 0}
+			onpointerdown={press(bit)}
+			onpointerup={release(bit)}
+			onpointercancel={release(bit)}
+			onpointerleave={release(bit)}>{bit}</button
+		>
+	{/each}
 </div>
 
 <style>
@@ -69,7 +91,7 @@
 		-webkit-tap-highlight-color: transparent;
 	}
 
-	button:active {
+	button.pressed {
 		background: var(--ink);
 		color: var(--paper);
 	}
