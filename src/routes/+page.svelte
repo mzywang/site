@@ -7,9 +7,9 @@
 </svelte:head>
 
 <ul>
+	<li><a href={resolve('/log')}>eng log</a></li>
 	<li><a href="https://github.com/mzywang">github.com/mzywang</a></li>
 	<li><a href="https://www.linkedin.com/in/mzywang">linkedin.com/in/mzywang</a></li>
-	<li><a href={resolve('/log')}>eng log</a></li>
 </ul>
 
 <style>
