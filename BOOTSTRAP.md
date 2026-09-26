@@ -97,38 +97,10 @@ EOF
 3. **Deploy command** (Production field) — `npx wrangler deploy`
 4. **Environment variables** — `NODE_VERSION=24`, matching `.nvmrc` so production builds use the same Node as CI (Cloudflare's default build image ships an older Node that fails Wrangler 4's engine check).
 5. **Branch control** — Settings -> Builds -> Branch control. Leave "Builds for non-production branches" unchecked (it's off by default) so only the production branch ever builds or deploys.
-6. **Deploy token** — profile/api-tokens -> "Edit Cloudflare Workers" template. Confirm **Account Resources** is scoped to your account (easy to miss: it can default to Zone Resources only, which authenticates but authorizes nothing — same generic `Authentication error [code: 10000]` as a wrong deploy command). Paste as `CLOUDFLARE_API_TOKEN` in Settings -> Environment variables, encrypted.
+6. **Build token** — Settings -> Builds -> API token -> **Create new token**. Workers Builds creates the token and stores its secret itself, and `wrangler deploy` in the build authenticates with it. No hand-made token or `CLOUDFLARE_API_TOKEN` variable is needed.
 7. **First build** — push to `main` to trigger it.
 
-A correctly-scoped token's summary screen looks like this. The account (not just zone) is named under its own resource block, and `Workers Scripts: Edit` is the permission `wrangler deploy` actually needs:
-
-**Account: `<you>`'s Account**
-
-| Permission                   | Access |
-| ---------------------------- | ------ |
-| Workers Agents Configuration | Edit   |
-| Containers                   | Edit   |
-| Workers Observability        | Edit   |
-| Workers Builds Configuration | Edit   |
-| Cloudflare Pages             | Edit   |
-| Workers R2 Storage           | Edit   |
-| Workers Tail                 | Read   |
-| Workers KV Storage           | Edit   |
-| Workers Scripts              | Edit   |
-| Account Settings             | Read   |
-
-**Zones: All zones**
-
-| Permission     | Access |
-| -------------- | ------ |
-| Workers Routes | Edit   |
-
-**Users: All users**
-
-| Permission   | Access |
-| ------------ | ------ |
-| Memberships  | Read   |
-| User Details | Read   |
+If a build fails with "The build token selected for this build has been deleted or rolled", Builds is holding a secret that no longer works — typically because the token was rolled, which keeps it listed as Active under API Tokens. Selecting the same token again doesn't help; use **Create new token** again, retry the build, then delete the old token.
 
 ### Add a Custom Domain
 
