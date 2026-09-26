@@ -115,7 +115,7 @@
 	<title>keyboard · mzywang.dev</title>
 </svelte:head>
 
-<!-- Wider than the page column so the keys are big enough to hit. -->
+<!-- Spans the screen, not just the page column, so the keys are big enough to hit. -->
 <div class="wide">
 	<!-- readonly so tapping the box doesn't bring up the on-screen keyboard. -->
 	<textarea bind:this={box} value={output} readonly rows="4" aria-label="output"></textarea>
@@ -147,7 +147,8 @@
 		position: relative;
 		left: 50%;
 		transform: translateX(-50%);
-		width: min(calc(100vw - 2.5rem), 60rem);
+		/* The whole screen, less the same 1.25rem side gutter as the page. */
+		width: calc(100vw - 2.5rem);
 	}
 
 	textarea {
