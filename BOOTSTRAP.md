@@ -96,7 +96,7 @@ EOF
 2. **Build command** — `npm run build`
 3. **Deploy command** (Production field) — `npx wrangler deploy`
 4. **Node version** — nothing to set. Workers Builds reads `.nvmrc`, so production builds use the same Node as CI (the log shows `Detected the following tools from environment: nodejs@24.x`).
-5. **Branch control** — Settings -> Builds -> Branch control. Leave "Builds for non-production branches" unchecked (it's off by default) so only the production branch ever builds or deploys.
+5. **Branch control** — Settings -> Builds -> Branch control. Check "Builds for non-production branches" and set the non-production deploy command to `npx wrangler versions upload`. Pushes to other branches then upload a new version without deploying it, and with `"preview_urls": true` in `wrangler.jsonc` each version gets its own preview URL on `workers.dev`. That doesn't need `workers_dev`, so production stays on the custom domain only.
 6. **Build token** — Settings -> Builds -> API token -> **Create new token**. Workers Builds creates the token and stores its secret itself, and `wrangler deploy` in the build authenticates with it.
 7. **First build** — push to `main` to trigger it.
 

@@ -9,6 +9,6 @@
 		"directory": ".svelte-kit/cloudflare"
 	},
 	"workers_dev": false,
-	"preview_urls": false,
+	"preview_urls": true,
 	"routes": [{ "pattern": "mzywang.dev", "custom_domain": true }]
 }
