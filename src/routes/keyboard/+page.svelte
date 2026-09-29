@@ -37,8 +37,8 @@
 	// How far each column sits below the middle finger's, pinky column first.
 	const stagger = [0.5, 0.125, 0, 0.125, 0.25];
 	// Gap between the halves, in key widths, before they're angled. Angling
-	// them spreads the thumb clusters apart, so this leaves about half a key
-	// between the inner thumbs.
+	// them spreads the thumb clusters apart, so this leaves about a key and a
+	// half between the halves where they come closest.
 	const split = 2.5;
 	// Where the right half starts.
 	const right = 5 + split;
@@ -59,10 +59,11 @@
 			rightHalf.push([at(r + 4, c), right + (4 - c), r + stagger[c]]);
 		}
 	}
-	// Thumbs, which aren't wired in physical order. Left, outer to inner:
+	// Thumbs, lined up with the columns and reaching one column in past each
+	// half. They aren't wired in physical order. Left, outer to inner:
 	// esc, space, tab. Right, inner to outer: ret, del.
-	leftHalf.push([at(3, 2), 3.5, thumbY], [at(3, 3), 4.5, thumbY], [at(3, 0), 5.5, thumbY]);
-	rightHalf.push([at(7, 0), right - 1.5, thumbY], [at(7, 2), right - 0.5, thumbY]);
+	leftHalf.push([at(3, 2), 3, thumbY], [at(3, 3), 4, thumbY], [at(3, 0), 5, thumbY]);
+	rightHalf.push([at(7, 0), right - 1, thumbY], [at(7, 2), right, thumbY]);
 
 	// Turns a half about the middle of its keys: clockwise for a positive angle.
 	function turn(half: Place[], angle: number): Key[] {
