@@ -35,8 +35,12 @@
 	// How far each column sits below the middle finger's, pinky column first.
 	const stagger = [0.5, 0.125, 0, 0.125, 0.25];
 	// Gap between the halves, in key widths.
-	const split = 2;
-	const width = 5 + split + 5;
+	// Wide enough that the thumb clusters, which reach in towards the middle,
+	// don't meet.
+	const split = 4;
+	// Where the right half starts.
+	const right = 5 + split;
+	const width = right + 5;
 	const thumbY = 3.5;
 	const height = thumbY + 1;
 
@@ -48,17 +52,17 @@
 			keys.push({ pos: at(r, c), x: c, y: r + stagger[c] });
 			// Matrix rows 4-6 are the right half, wired from the pinky inwards,
 			// so matrix column c sits at physical column 4 - c.
-			keys.push({ pos: at(r + 4, c), x: 5 + split + (4 - c), y: r + stagger[c] });
+			keys.push({ pos: at(r + 4, c), x: right + (4 - c), y: r + stagger[c] });
 		}
 	}
 	// Thumbs, which aren't wired in physical order. Left, outer to inner:
 	// esc, space, tab. Right, inner to outer: ret, del.
 	keys.push(
-		{ pos: at(3, 2), x: 1.5, y: thumbY },
-		{ pos: at(3, 3), x: 2.5, y: thumbY },
-		{ pos: at(3, 0), x: 3.5, y: thumbY },
-		{ pos: at(7, 0), x: width - 4.5, y: thumbY },
-		{ pos: at(7, 2), x: width - 3.5, y: thumbY }
+		{ pos: at(3, 2), x: 3.5, y: thumbY },
+		{ pos: at(3, 3), x: 4.5, y: thumbY },
+		{ pos: at(3, 0), x: 5.5, y: thumbY },
+		{ pos: at(7, 0), x: right - 1.5, y: thumbY },
+		{ pos: at(7, 2), x: right - 0.5, y: thumbY }
 	);
 
 	interface Held {
