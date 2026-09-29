@@ -54,11 +54,11 @@
 	// Thumbs, which aren't wired in physical order. Left, outer to inner:
 	// esc, space, tab. Right, inner to outer: ret, del.
 	keys.push(
-		{ pos: at(3, 2), x: 2.5, y: thumbY },
-		{ pos: at(3, 3), x: 3.5, y: thumbY },
-		{ pos: at(3, 0), x: 4.5, y: thumbY },
-		{ pos: at(7, 0), x: width - 5.5, y: thumbY },
-		{ pos: at(7, 2), x: width - 4.5, y: thumbY }
+		{ pos: at(3, 2), x: 1.5, y: thumbY },
+		{ pos: at(3, 3), x: 2.5, y: thumbY },
+		{ pos: at(3, 0), x: 3.5, y: thumbY },
+		{ pos: at(7, 0), x: width - 4.5, y: thumbY },
+		{ pos: at(7, 2), x: width - 3.5, y: thumbY }
 	);
 
 	interface Held {
