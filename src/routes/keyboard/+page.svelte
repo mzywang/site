@@ -7,7 +7,22 @@
 	// It's for a Charybdis Nano: a 3x5 split with column stagger, three thumb
 	// keys on the left and two on the right (the trackball takes the third).
 	const config: Config = argos;
-	const layers: Action[][] = config.keycodes.map((layer) => layer.map((c) => decode(c, config)));
+
+	// The pointer layer drives the trackball, which there's no use for here, so
+	// its layer-tap keys just type their tap key.
+	const skipped = new Set([config.layerNames.indexOf('pointer')]);
+	const layers: Action[][] = config.keycodes.map((layer) =>
+		layer.map((c): Action => {
+			const a = decode(c, config);
+			return a.type === 'dual' && 'layer' in a.hold && skipped.has(a.hold.layer)
+				? { type: 'key', code: a.tap, mods: 0 }
+				: a;
+		})
+	);
+
+	// Shorter names for the layers whose full names don't fit under a key.
+	const short: Record<string, string> = { navigation: 'nav', function: 'fn' };
+	const layerName = (layer: number) => short[config.layerNames[layer]] ?? config.layerNames[layer];
 
 	interface Key {
 		// Index into each layer's keycodes: row * cols + col in the matrix.
@@ -62,12 +77,13 @@
 	function layerOf(h: Held): number | null {
 		const a = h.action;
 		if (a.type === 'layer') return a.layer;
-		if (a.type === 'dual' && 'layer' in a.hold && h.state !== 'done') return a.hold.layer;
+		if (a.type === 'dual' && 'layer' in a.hold && h.state === 'hold') return a.hold.layer;
 		return null;
 	}
 
-	// Layer keys switch layers as soon as they're pressed, so holding one shows
-	// its layer straight away. The highest active layer wins, as in QMK.
+	// A layer key switches layers once it's a hold: after the tapping term, or
+	// as soon as another key is pressed. Waiting keeps a quick tap from flashing
+	// the layer. The highest active layer wins, as in QMK.
 	let on = $derived(new Set([0, ...held.map(layerOf).filter((l) => l !== null)]));
 	let active = $derived(Math.max(...on));
 
@@ -91,20 +107,26 @@
 		return { type: 'none' };
 	}
 
+	// While shift is held the legends show what the keys would type, e.g. "A"
+	// and "!" instead of "a" and "1".
+	let shift = $derived(mods & SFT);
+	// Only keys that print change; the rest, like arrows, keep their legend.
+	const shiftFor = (code: number) => (char(code, true) ? shift : 0);
+
 	function legend(pos: number): { main: string; sub?: string } {
 		const a = resolve(pos);
 		switch (a.type) {
 			case 'key':
-				return { main: keyLabel(a.code, a.mods) };
+				return { main: keyLabel(a.code, a.mods | shiftFor(a.code)) };
 			case 'dual':
 				return {
-					main: keyLabel(a.tap),
-					sub: 'layer' in a.hold ? config.layerNames[a.hold.layer] : modsLabel(a.hold.mods)
+					main: keyLabel(a.tap, shiftFor(a.tap)),
+					sub: 'layer' in a.hold ? layerName(a.hold.layer) : modsLabel(a.hold.mods)
 				};
 			case 'mod':
 				return { main: modsLabel(a.mods) };
 			case 'layer':
-				return { main: config.layerNames[a.layer] };
+				return { main: layerName(a.layer) };
 			case 'other':
 				return { main: a.label };
 			default:
@@ -157,6 +179,14 @@
 				start: now,
 				state: action.type === 'dual' ? 'undecided' : 'hold'
 			});
+			// Held past the tapping term on its own: a hold, which for a layer key
+			// shows its layer.
+			if (action.type === 'dual') {
+				const h = held[held.length - 1];
+				setTimeout(() => {
+					if (held.includes(h) && h.state === 'undecided') h.state = 'hold';
+				}, config.tappingTerm);
+			}
 		};
 	}
 
@@ -190,7 +220,7 @@
 	<textarea bind:this={box} value={output} readonly rows="4" aria-label="output"></textarea>
 
 	<div class="keyboard">
-		<p class="layer" aria-live="polite">{config.layerNames[active]}</p>
+		<p class="layer" aria-live="polite">{layerName(active)}</p>
 		<div class="board" style:--cols={width} style:--rows={height}>
 			{#each keys as key (key.pos)}
 				{@const l = legend(key.pos)}
