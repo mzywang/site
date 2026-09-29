@@ -36,9 +36,10 @@
 
 	// How far each column sits below the middle finger's, pinky column first.
 	const stagger = [0.5, 0.125, 0, 0.125, 0.25];
-	// Gap between the halves, in key widths. Wide enough that the thumb
-	// clusters, which reach in towards the middle, don't meet.
-	const split = 4;
+	// Gap between the halves, in key widths, before they're angled. Angling
+	// them spreads the thumb clusters apart, so this leaves about half a key
+	// between the inner thumbs.
+	const split = 2.5;
 	// Where the right half starts.
 	const right = 5 + split;
 	const thumbY = 3.5;
