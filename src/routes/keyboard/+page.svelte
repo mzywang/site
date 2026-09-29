@@ -27,43 +27,72 @@
 	interface Key {
 		// Index into each layer's keycodes: row * cols + col in the matrix.
 		pos: number;
-		// Position in key widths from the top left of the board.
+		// Position of the top left corner in key widths from the top left of the
+		// board, and how far the key is turned, in degrees clockwise.
 		x: number;
 		y: number;
+		angle: number;
 	}
 
 	// How far each column sits below the middle finger's, pinky column first.
 	const stagger = [0.5, 0.125, 0, 0.125, 0.25];
-	// Gap between the halves, in key widths.
-	// Wide enough that the thumb clusters, which reach in towards the middle,
-	// don't meet.
+	// Gap between the halves, in key widths. Wide enough that the thumb
+	// clusters, which reach in towards the middle, don't meet.
 	const split = 4;
 	// Where the right half starts.
 	const right = 5 + split;
-	const width = right + 5;
 	const thumbY = 3.5;
-	const height = thumbY + 1;
+	// Each half is angled in by this much, in degrees.
+	const tilt = 15;
 
 	const at = (row: number, col: number) => row * config.cols + col;
 
-	const keys: Key[] = [];
+	type Place = [pos: number, x: number, y: number];
+	const leftHalf: Place[] = [];
+	const rightHalf: Place[] = [];
 	for (let r = 0; r < 3; r++) {
 		for (let c = 0; c < 5; c++) {
-			keys.push({ pos: at(r, c), x: c, y: r + stagger[c] });
+			leftHalf.push([at(r, c), c, r + stagger[c]]);
 			// Matrix rows 4-6 are the right half, wired from the pinky inwards,
 			// so matrix column c sits at physical column 4 - c.
-			keys.push({ pos: at(r + 4, c), x: right + (4 - c), y: r + stagger[c] });
+			rightHalf.push([at(r + 4, c), right + (4 - c), r + stagger[c]]);
 		}
 	}
 	// Thumbs, which aren't wired in physical order. Left, outer to inner:
 	// esc, space, tab. Right, inner to outer: ret, del.
-	keys.push(
-		{ pos: at(3, 2), x: 3.5, y: thumbY },
-		{ pos: at(3, 3), x: 4.5, y: thumbY },
-		{ pos: at(3, 0), x: 5.5, y: thumbY },
-		{ pos: at(7, 0), x: right - 1.5, y: thumbY },
-		{ pos: at(7, 2), x: right - 0.5, y: thumbY }
-	);
+	leftHalf.push([at(3, 2), 3.5, thumbY], [at(3, 3), 4.5, thumbY], [at(3, 0), 5.5, thumbY]);
+	rightHalf.push([at(7, 0), right - 1.5, thumbY], [at(7, 2), right - 0.5, thumbY]);
+
+	// Turns a half about the middle of its keys: clockwise for a positive angle.
+	function turn(half: Place[], angle: number): Key[] {
+		const xs = half.flatMap(([, x]) => [x, x + 1]);
+		const ys = half.flatMap(([, , y]) => [y, y + 1]);
+		const px = (Math.min(...xs) + Math.max(...xs)) / 2;
+		const py = (Math.min(...ys) + Math.max(...ys)) / 2;
+		const rad = (angle * Math.PI) / 180;
+		const [cos, sin] = [Math.cos(rad), Math.sin(rad)];
+		return half.map(([pos, x, y]) => {
+			// Turn each key about its centre, which is where CSS rotates it from.
+			const [dx, dy] = [x + 0.5 - px, y + 0.5 - py];
+			return {
+				pos,
+				x: px + dx * cos - dy * sin - 0.5,
+				y: py + dx * sin + dy * cos - 0.5,
+				angle
+			};
+		});
+	}
+
+	const turned = [...turn(leftHalf, tilt), ...turn(rightHalf, -tilt)];
+
+	// Fit the board to the turned keys: a turned key reaches this far past
+	// its unturned square on every side.
+	const reach = (Math.cos((tilt * Math.PI) / 180) + Math.sin((tilt * Math.PI) / 180) - 1) / 2;
+	const minX = Math.min(...turned.map((k) => k.x)) - reach;
+	const minY = Math.min(...turned.map((k) => k.y)) - reach;
+	const keys: Key[] = turned.map((k) => ({ ...k, x: k.x - minX, y: k.y - minY }));
+	const width = Math.max(...keys.map((k) => k.x)) + 1 + reach;
+	const height = Math.max(...keys.map((k) => k.y)) + 1 + reach;
 
 	interface Held {
 		pointer: number;
@@ -235,6 +264,7 @@
 					class:small={[...l.main].length > 1}
 					style:--x={key.x}
 					style:--y={key.y}
+					style:--angle="{key.angle}deg"
 					onpointerdown={press(key)}
 					onpointerup={release}
 					onpointercancel={release}
@@ -300,6 +330,7 @@
 		top: calc(var(--y) * var(--u) + var(--gap) / 2);
 		width: calc(var(--u) - var(--gap));
 		height: calc(var(--u) - var(--gap));
+		transform: rotate(var(--angle));
 		padding: 0;
 		border: 1px solid var(--ink);
 		border-radius: 0;
